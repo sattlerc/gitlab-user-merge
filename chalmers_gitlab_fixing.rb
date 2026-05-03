@@ -4,10 +4,10 @@ $LOAD_PATH.unshift File.dirname(__FILE__)
 
 module ChalmersGitlabFixing
   # Path constants.
-  PATH_JSON_ANALYSIS = '/home/sattler/mnt/analysis.json'
-  DIR_JSON_ANALYSIS = '/home/sattler/mnt/analysis'
-  DIR_JSON = '/home/sattler/mnt/json'
-  DIR_TEXT = '/home/sattler/mnt/text'
+  # PATH_JSON_ANALYSIS = '/home/sattler/mnt/analysis.json'
+  # DIR_JSON_ANALYSIS = '/home/sattler/mnt/analysis'
+  # DIR_JSON = '/home/sattler/mnt/json'
+  # DIR_TEXT = '/home/sattler/mnt/text'
 end
 
 load 'chalmers_gitlab_fixing/general.rb'
@@ -25,12 +25,12 @@ load 'chalmers_gitlab_fixing/uniqueness_check.rb'
 
 #ChalmersGitlabFixing::ColumnClassifier.new.scan
 
-class AA
-  include ChalmersGitlabFixing::UserMapping
-end
+# class AA
+#   include ChalmersGitlabFixing::UserMapping
+# end
 
-module C
-  include ChalmersGitlabFixing
+# module C
+#   include ChalmersGitlabFixing
 
   # classifier = ChalmersGitlabFixing::ColumnClassifier.new
   # classifier.scan
@@ -40,10 +40,10 @@ module C
   #   chrono.check(file: file, strict: false)
   # end
 
-  U = ChalmersGitlabFixing::UniquenessCheck.new
-  File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|
-    U.print_column_conflicts_by_version_user_id(file: file, resolution: true)
-  end
+  # U = ChalmersGitlabFixing::UniquenessCheck.new
+  # File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|
+  #   U.print_column_conflicts_by_version_user_id(file: file, resolution: true)
+  # end
   # File.open('/home/sattler/mnt/column_conflicts_by_table_and_column.txt', 'w') do |file|
   #   U.print_column_conflicts_by_table_and_column(file: file, resolution: true)
   # end
@@ -55,6 +55,6 @@ module C
   #checker.print_relevant_unique_index
   #checker.print_conflict_columns
   #checker.print_resolve_conflicts(resolution: false)
-end
+# end
 
 # load "/home/sattler/mnt/ruby/chalmers_gitlab_fixing.rb"
