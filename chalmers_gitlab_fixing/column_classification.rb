@@ -34,20 +34,20 @@ module ChalmersGitlabFixing
       }
     end
 
-    def report_table_columns(name, table_columns)
-      puts "#{name}: #{table_columns.length}"
+    def report_table_columns(name, table_columns, file: $stdout)
+      file.puts "#{name}: #{table_columns.length}"
       return if table_columns.empty?
 
-      table_columns.each do |table_column|
-        puts "- #{format_table_column(table_column)}"
+      table_columns.each do |table, column|
+        file.puts "- #{table}.#{column}"
       end
-      puts
+      file.puts
     end
 
-    def report
-      report_table_columns('positive', @positive)
-      report_table_columns('negative', @negative)
-      report_table_columns('unrecognized', @unrecognized)
+    def report(file: $stdout)
+      report_table_columns('positive', @positive, file: file)
+      report_table_columns('negative', @negative, file: file)
+      report_table_columns('unrecognized', @unrecognized, file: file)
     end
   end
 
@@ -86,12 +86,14 @@ module ChalmersGitlabFixing
       }
     end
 
-    def report
+    def report(file: stdout)
+      file.puts '## Column classification report'
+      file.puts
       hash.each do |kind, matches|
-        puts "## #{kind.to_s.capitalize} columns"
-        puts
-        matches.report
-        puts
+        file.puts "### #{kind.to_s.capitalize} columns"
+        file.puts
+        matches.report(file: file)
+        file.puts
       end
     end
   end
@@ -326,8 +328,13 @@ module ChalmersGitlabFixing
           end
         end
       end
-      cc.report
-      JSON.write(PATH_COLUMN_CLASSIFICATION, ::JSON.parse(cc.to_json))
+      cc
+    end
+
+    def scan_and_write(path_out: PATH_COLUMN_CLASSIFICATION, file: $stdout)
+      cc = scan
+      cc.report(file: file)
+      JSON.write(path_out, ::JSON.parse(cc.to_json))
       puts "Column classification written to #{PATH_COLUMN_CLASSIFICATION}."
     end
   end
