@@ -74,7 +74,7 @@ module ChalmersGitlabFixing
       time.utc.strftime('%FT%T')
     end
 
-    def format_user(user)
+    def format_user_detailed(user)
       SQL.spacing do |e|
         e << user.id
         e << "@#{user.username}"
@@ -89,7 +89,7 @@ module ChalmersGitlabFixing
       end
     end
 
-    def format_version_user(version_user)
+    def format_version_user_detailed(version_user)
       xs = version_user.entries.map { |version, user| "#{version}: #{format_user(user)}" }
       "{#{xs.join(', ')}}"
     end
@@ -98,7 +98,7 @@ module ChalmersGitlabFixing
       puts 'Checking violations of chronologicity...'
       user_mapping.entries.each do |entry|
         version_user = user_mapping_entry_as_version(entry).transform_values { |id| User.find(id) }
-        puts "Checking #{format_version_user(version_user)}..."
+        puts "Checking #{format_version_user_detailed(version_user)}..."
 
         counterexamples = Enumerator.new do |e|
           CHONOLOGICITY_CHECKS.entries.each do |(table, column), time_columns|
@@ -117,7 +117,7 @@ module ChalmersGitlabFixing
               next if values[:target].nil? || values[:source].nil? || values[:target] <= values[:source]
 
               e << [[table, time_column], values]
-              raise "Non-monotone table column #{table}.#{time_column} for #{format_version_user(version_user)}: #{values}" if strict
+              raise "Non-monotone table column #{table}.#{time_column} for #{format_version_user_detailed(version_user)}: #{values}" if strict
             end
           end
         end.to_a
