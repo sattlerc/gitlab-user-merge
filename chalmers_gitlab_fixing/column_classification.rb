@@ -15,7 +15,6 @@ module ChalmersGitlabFixing
   class ColumnMatches
     include ActiveModel::Serialization
     include Deserialization
-    include Format
 
     def initialize
       @positive = Set.new
@@ -33,6 +32,16 @@ module ChalmersGitlabFixing
         :unrecognized => @unrecognized,
         :ignored => @ignored
       }
+    end
+
+    def report_table_columns(name, table_columns)
+      puts "#{name}: #{table_columns.length}"
+      return if table_columns.empty?
+
+      table_columns.each do |table_column|
+        puts "- #{format_table_column(table_column)}"
+      end
+      puts
     end
 
     def report
@@ -100,7 +109,6 @@ module ChalmersGitlabFixing
 
   # Creates column classification.
   class ColumnClassifier
-    include Format
     include SQLExecution
     include Models
     include UserMapping

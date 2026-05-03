@@ -42,6 +42,10 @@ module ChalmersGitlabFixing
       end
     end
 
+    def format_project(project)
+      "#{project.id} (#{project.namespace.path}/#{project.path})"
+    end
+
     def foreign_keys_for_model_uncached(model)
       model.reflections.entries.each_with_object({}) do |entry, h|
         name, reflection = entry

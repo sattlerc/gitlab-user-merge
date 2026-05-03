@@ -12,7 +12,6 @@ end
 
 load 'chalmers_gitlab_fixing/general.rb'
 load 'chalmers_gitlab_fixing/deserialization.rb'
-load 'chalmers_gitlab_fixing/format.rb'
 load 'chalmers_gitlab_fixing/json.rb'
 load 'chalmers_gitlab_fixing/sql.rb'
 load 'chalmers_gitlab_fixing/models.rb'
@@ -29,8 +28,8 @@ load 'chalmers_gitlab_fixing/uniqueness_check.rb'
 #   include ChalmersGitlabFixing::UserMapping
 # end
 
-# module C
-#   include ChalmersGitlabFixing
+module C
+  include ChalmersGitlabFixing
 
   # classifier = ChalmersGitlabFixing::ColumnClassifier.new
   # classifier.scan
@@ -55,6 +54,6 @@ load 'chalmers_gitlab_fixing/uniqueness_check.rb'
   #checker.print_relevant_unique_index
   #checker.print_conflict_columns
   #checker.print_resolve_conflicts(resolution: false)
-# end
+end
 
 # load "/home/sattler/mnt/ruby/chalmers_gitlab_fixing.rb"
