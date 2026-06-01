@@ -372,58 +372,26 @@ module ChalmersGitlabFixing
       end
     end
 
-    def print_conflicts(file: $stdout, resolution: false)
-      column_conflicts_by_table.entries.each do |table, conflicts|
-        file.puts "## #{table}"
-        file.puts
-        conflicts.entries.each do |version_key, values|
-          next if values.empty?
+    def resolution_sql_queries_for_table(table, &block)
+      column_conflicts_by_table[table].entries.each do |version_keys, values|
+        resolution_sql_queries_for_conflict(table, version_keys, values, &block)
+      end
+    end
 
-          file.puts "key #{version_key}:"
+    def resolution_sql_queries(&block)
+      f = proc do |table|
+        resolution_sql_queries_for_table(table, &block)
+      end
 
-          values.entries.each do |column, version_value|
-            c = columns_for_table(table)[column]
-            file.puts "  * #{column} (#{c.sql_type}, default #{c.default.inspect}) #{version_value}"
-            if resolution
-              version = conflict_winner(table, column, version_value)
-              file.puts "    resolution #{version}"
-            end
-          end
-          next unless resolution
+      # Delete from users table last to handle cascading deletion.
+      table_users, table_non_users = column_conflicts_by_table.keys.partition { |table| table == 'users' }
+      table_non_users.each(&f)
+      table_users.each(&f)
+    end
 
-          assignments = values.entries.map do |column, version_value|
-            version = conflict_winner(table, column, version_value)
-            raise "Unrecognized conflict winner #{version.inspect}" unless VERSIONS.include?(version)
-
-            if version == :target
-              nil
-            else
-              [column, SQL.table_column(Version.sql(version), column)]
-            end
-          end.compact
-
-          query_update = SQL.spacing do |e|
-            e << SQL::UPDATE
-            e << SQL.identifier(TARGET)
-            e << SQL.set(assignments)
-            e << SQL.from(Version::VERSIONS.map { |v| [table, Version.sql(v)] })
-            e << SQL.where do |e1|
-              Version::VERSIONS.each do |v|
-                version_key[v].entries.each do |key, value|
-                  e1 << SQL.equals(SQL.table_column(Version.sql(v), key), SQL.value(value))
-                end
-              end
-            end
-          end
-          file.puts query_update unless assignments.empty?
-          query_delete = SQL.spacing do |e|
-            e << SQL::DELETE
-            e << SQL.from(table)
-            e << SQL.where(keys_clause(version_key[:source]))
-          end
-          file.puts query_delete
-        end
-        puts
+    def print_resolution_queries(file: $stdout)
+      resolution_sql_queries do |query|
+        file.puts query
       end
     end
 

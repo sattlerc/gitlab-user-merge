@@ -606,5 +606,46 @@ module ChalmersGitlabFixing
 
       resolution(table, column).action(version_keys, version_value).format(version_value)
     end
+
+    def resolution_sql_queries_for_conflict(table, version_keys, values, &block)
+      assignments = Enumerator.new do |e|
+        values.entries.each do |column, version_value|
+          resolution = resolution(table, column)
+          next unless resolution.resolve?
+
+          action = resolution.action(version_keys, version_value)
+          next if action.respond_to?(:version) && action.version == :target
+
+          e << [
+            column,
+            action.combine_sql(Version::VERSIONS.index_with { |v| Version.sql_column(v, column) })
+          ]
+        end
+      end.to_a
+
+      unless assignments.empty?
+        update = SQL.spacing do |e|
+          e << SQL::UPDATE
+          e << SQL.as(SQL.identifier(table), Version.sql(:target))
+          e << SQL.set(assignments)
+          e << SQL.from(Version::VERSIONS.reject { |v| v == :target }.map { |v| [table, Version.sql(v)] })
+          e << SQL.where do |e1|
+            Version::VERSIONS.each do |v|
+              version_keys[v].entries.each do |key, value|
+                e1 << SQL.equals(Version.sql_column(v, key), SQL.value(value))
+              end
+            end
+          end
+        end
+        block.call(update)
+      end
+
+      delete = SQL.spacing do |e|
+        e << SQL::DELETE
+        e << SQL.from(table)
+        e << SQL.where(keys_clause(version_keys[:source]))
+      end
+      block.call(delete)
+    end
   end
 end
