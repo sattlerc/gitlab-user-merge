@@ -40,14 +40,14 @@ module ChalmersGitlabFixing
     #     e << SQL::SELECT
     #     e << SQL.listing do |e1|
     #       Version::VERSIONS.each do |v|
-    #         e1 << SQL.as(SQL.table_column(Version.sql(v), user_column), SQL::ANY)
+    #         e1 << SQL.as(Version.sql_column(v, user_column), SQL::ANY)
     #       end
     #     end
     #     e << SQL.from([*Version::VERSIONS.map { |v| [table, Version.sql(v)] }, TABLE_USER_MAPPING])
     #     e << SQL.where do |e1|
     #       Version::VERSIONS.each do |v|
     #         e1 << SQL.equals(
-    #           SQL.table_column(Version.sql(v), column),
+    #           Version.sql_column(v, column),
     #           SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[v])
     #         )
     #       end
@@ -185,22 +185,22 @@ module ChalmersGitlabFixing
         e << SQL::SELECT
         e << SQL.listing do |e1|
           Version::VERSIONS.each do |v|
-            e1 << SQL.as(SQL.table_column(Version.sql(v), user_column), Version.sql_user_id(v))
+            e1 << SQL.as(Version.sql_column(v, user_column), Version.sql_user_id(v))
           end
           other_columns.each do |column|
-            e1 << SQL.as(SQL.table_column(Version.sql(:source), column), column)
+            e1 << SQL.as(Version.sql_column(:source, column), column)
           end
         end
         e << SQL.from([*Version::VERSIONS.map { |v| [table, Version.sql(v)] }, TABLE_USER_MAPPING])
         e << SQL.where do |e1|
           Version::VERSIONS.each do |v|
             e1 << SQL.equals(
-              SQL.table_column(Version.sql(v), user_column),
+              Version.sql_column(v, user_column),
               SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[v])
             )
           end
           other_columns.each do |column|
-            e1 << SQL.equals(*Version::VERSIONS.map { |v| SQL.table_column(Version.sql(v), column) })
+            e1 << SQL.equals(*Version::VERSIONS.map { |v| Version.sql_column(v, column) })
           end
         end
       end
@@ -234,12 +234,12 @@ module ChalmersGitlabFixing
         version_row = version_keys.transform_values { |key| select_unique_by_keys(table, key) }
 
         key = General.from_singleton(version_row.values.map(&:keys).to_set)
-        version_value = key
+        values = key
           .reject { |column| column == user_column }
           .reject { |column| !resolution(table, column).nil? && resolution(table, column).ignore? }
           .reject { |column| General.equal_strictly(*version_row.values.map { |row| row[column] }) }
           .index_with { |column| version_row.transform_values { |row| row[column] } }
-        [version_keys, version_value]
+        [version_keys, values]
       end.compact.to_h
     end
 
@@ -278,9 +278,9 @@ module ChalmersGitlabFixing
 
     def column_conflicts_by_table_and_column_uncached
       column_conflicts_by_table.transform_values do |conflicts|
-        separated = conflicts.entries.flat_map do |version_key, values|
+        separated = conflicts.entries.flat_map do |version_keys, values|
           values.entries.map do |column, version_value|
-            [column, [version_key, version_value]]
+            [column, [version_keys, version_value]]
           end
         end
         General.group(separated).transform_values do |for_column|

@@ -26,19 +26,16 @@ module ChalmersGitlabFixing
       }
     end
 
-    def self.string(version)
-      {
-        source: '_source',
-        target: '_target'
-      }.fetch(version)
-    end
-
     def self.sql(version)
-      "_#{string(version)}"
+      "_#{version}"
     end
 
     def self.sql_user_id(version)
-      "_#{string(version)}_user_id"
+      "_#{version}_user_id"
+    end
+
+    def self.sql_column(version, column)
+      SQL.table_column(sql(version), column)
     end
   end
 end

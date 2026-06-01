@@ -173,11 +173,11 @@ module ChalmersGitlabFixing
       operator_binary('+', *args)
     end
 
-    def self.op_sum(args)
+    def self.op_sum(*args)
       return integer(0) if args.empty?
 
       first, *other = args
-      other.reduce(first, :plus)
+      other.reduce(first) { |a, b| plus(a, b) }
     end
 
     def self.upper_bound(arg)
@@ -212,7 +212,7 @@ module ChalmersGitlabFixing
     end
 
     def self.identifier(identifier)
-      ActiveRecord::Base.connection.quote_table_name(identifier)
+      ActiveRecord::Base.connection.quote_table_name(identifier.to_s)
       # equivalently:
       # ActiveRecord::Base.connection.quote_column_name(column)
     end

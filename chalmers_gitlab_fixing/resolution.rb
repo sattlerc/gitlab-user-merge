@@ -40,7 +40,7 @@ module ChalmersGitlabFixing
       end
 
       def combine_sql(version_fragment)
-        version_fragment.fetch(fragment)
+        version_fragment.fetch(version)
       end
 
       def to_s

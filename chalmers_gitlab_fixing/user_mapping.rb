@@ -14,6 +14,10 @@ module ChalmersGitlabFixing
       @user_mapping ||= JSON.read(PATH_USER_MAPPING).transform_keys(&:to_i)
     end
 
+    def versions_user_id
+      user_mapping.entries.map { |e| Version.of_pair(e) }
+    end
+
     def duplicated_user_ids
       user_mapping.keys.to_set
     end

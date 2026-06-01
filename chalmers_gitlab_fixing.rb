@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.dirname(__FILE__)
-
 module ChalmersGitlabFixing
   # Path constants.
   # PATH_JSON_ANALYSIS = '/home/sattler/mnt/analysis.json'
@@ -10,6 +8,8 @@ module ChalmersGitlabFixing
   # DIR_TEXT = '/home/sattler/mnt/text'
 end
 
+# change to require_relative
+$LOAD_PATH.unshift File.dirname(__FILE__)
 load 'chalmers_gitlab_fixing/general.rb'
 load 'chalmers_gitlab_fixing/deserialization.rb'
 load 'chalmers_gitlab_fixing/json.rb'
