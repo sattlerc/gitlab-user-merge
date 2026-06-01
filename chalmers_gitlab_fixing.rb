@@ -17,29 +17,37 @@ load 'chalmers_gitlab_fixing/sql.rb'
 load 'chalmers_gitlab_fixing/models.rb'
 load 'chalmers_gitlab_fixing/version.rb'
 load 'chalmers_gitlab_fixing/user_mapping.rb'
+load 'chalmers_gitlab_fixing/personal_projects.rb'
 load 'chalmers_gitlab_fixing/column_classification.rb'
 load 'chalmers_gitlab_fixing/chronologicity.rb'
 load 'chalmers_gitlab_fixing/resolution.rb'
 load 'chalmers_gitlab_fixing/uniqueness_check.rb'
-
-#ChalmersGitlabFixing::ColumnClassifier.new.scan
-
-# class AA
-#   include ChalmersGitlabFixing::UserMapping
-# end
+load 'chalmers_gitlab_fixing/membership.rb'
 
 module C
-  include ChalmersGitlabFixing
+  # include ChalmersGitlabFixing
 
-  # classifier = ChalmersGitlabFixing::ColumnClassifier.new
-  # classifier.scan
+  M = ChalmersGitlabFixing::Membership.new
+  # M.test
+
+  # C = ChalmersGitlabFixing::ColumnClassifier.new
+  # File.open('/home/sattler/mnt/column-classification-report.txt', 'w') do |file|
+  #   C.scan_and_write(file: file)
+  # end
 
   # chrono = ChalmersGitlabFixing::ChronologicityCheck.new
   # File.open('/home/sattler/mnt/chronicity.txt', 'w') do |file|
   #   chrono.check(file: file, strict: false)
   # end
 
-  # U = ChalmersGitlabFixing::UniquenessCheck.new
+  U = ChalmersGitlabFixing::UniquenessCheck.new
+  # U.print_resolution_queries
+
+  P = ChalmersGitlabFixing::PersonalProjects.new
+  # P.report_namespace_projects
+  # P.check_namespace_projects
+  P.transfer_personal_projects
+
   # File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|
   #   U.print_column_conflicts_by_version_user_id(file: file, resolution: true)
   # end
