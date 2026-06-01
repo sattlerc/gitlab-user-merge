@@ -58,6 +58,60 @@ module ChalmersGitlabFixing
       hash.to_h { |k, v| [k, block.call(k, v)] }
     end
 
+    def self.hierarchy(entries, &block)
+      r = General.group(entries.map(&block)) do |path, value|
+        # puts "path #{path}: value #{value}"
+        raise "Ouch" if value.nil?
+        if path.empty?
+          [nil, value]
+        else
+          first, *other = path
+          # puts "first #{first}, other #{other}"
+          [first, [other, value]]
+        end
+      end
+      r.entries.each do |path, values|
+        # puts "path #{path}: values #{values}"
+        raise "X" if values.include?(nil)
+      end
+      top = r.delete(nil) { [] }
+      r.transform_values! { |es| hierarchy(es) }
+      [top, r]
+    end
+
+    def self.print_hierarchy(hierarchy, key: nil, prefix_bullet: '', prefix_other: '', &print_value)
+      return if hierarchy.nil?
+
+      value, dir = hierarchy
+      prefix = prefix_bullet
+      prefix += "#{key}: " unless key.nil?
+      print_value.call(value, prefix: prefix)
+
+      dir.entries.each do |subkey, subhierarchy|
+        print_hierarchy(
+          subhierarchy,
+          key: subkey,
+          prefix_bullet: prefix_other + '- ',
+          prefix_other: prefix_other + '  ',
+          &print_value
+        )
+      end
+    end
+
+    def self.hierarchy_get(hierarchy, path, &combine)
+      return nil if hierarchy.nil?
+
+      top, dir = hierarchy
+      return top if path.empty?
+
+      raise 'empty path' if path.empty?
+
+      first, *other = path
+      r = hierarchy_get(dir[first], other)
+      r = combine.call(top, r) unless combine.nil?
+      r
+    end
+
     def self.from_singleton(collection, allow_empty: false)
       return collection.first if collection.length == 1
       return nil if allow_empty && collection.empty?
