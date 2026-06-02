@@ -31,6 +31,8 @@ module ChalmersGitlabFixing
     end
 
     def check_personal_projects_for_conflict
+      puts 'Checking personal projects for conflicts...'
+
       good = true
       versions_user_id.each do |version_user_id|
         version_user = version_user_id.transform_values { |id| user(id) }
@@ -74,9 +76,26 @@ module ChalmersGitlabFixing
     end
 
     def check_personal_projects_clear
-      puts 'Checking no personal projects need transfer...'
+      puts 'Checking no remaining personal projects need transfer...'
       versions_user_id.each do |version_user_id|
         check_no_personal_projects_for_user_id(version_user_id[:source])
+      end
+    end
+
+    # TODO: move elsewhere
+
+    def refresh_project_authorizations
+      puts 'Refreshing project authorizations...'
+      worker = AuthorizedProjectsWorker.new
+      versions_user_id.each do |version_user_id|
+        worker.perform(version_user_id[:target])
+      end
+    end
+
+    def refresh_user_highest_roles
+      puts 'Refreshing user highest roles...'
+      versions_user_id.each do |version_user_id|
+        Users::UpdateHighestMemberRoleService.new(user(version_user_id[:target])).execute
       end
     end
   end

@@ -23,6 +23,7 @@ load 'chalmers_gitlab_fixing/chronologicity.rb'
 load 'chalmers_gitlab_fixing/resolution.rb'
 load 'chalmers_gitlab_fixing/uniqueness_check.rb'
 load 'chalmers_gitlab_fixing/membership.rb'
+load 'chalmers_gitlab_fixing/replacement.rb'
 
 module C
   # include ChalmersGitlabFixing
@@ -46,7 +47,10 @@ module C
   P = ChalmersGitlabFixing::PersonalProjects.new
   # P.report_namespace_projects
   # P.check_namespace_projects
-  P.transfer_personal_projects
+  # P.transfer_personal_projects
+
+  R = ChalmersGitlabFixing::Replacement.new
+  R.test
 
   # File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|
   #   U.print_column_conflicts_by_version_user_id(file: file, resolution: true)

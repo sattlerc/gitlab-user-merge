@@ -98,8 +98,24 @@ module ChalmersGitlabFixing
     end
   end
 
+  module ColumnClassificationHelper
+    def polymorphic_type_column(table, column)
+      stem = column.name.delete_suffix('_id')
+      return nil if stem == column.name
+
+      column_type_name = "#{stem}_type"
+      column_type = columns_for_table(table)[column_type_name]
+      return nil if column_type.nil?
+      return nil unless SQL.type_text?(column_type.sql_type)
+
+      column_type
+    end
+  end
+
   # Loading and caching a column classification.
   module WithColumnClassification
+    include UserMapping
+
     def column_classification
       @column_classification ||= ColumnClassification.new.deserialize(JSON.read(PATH_COLUMN_CLASSIFICATION))
     end
@@ -177,18 +193,6 @@ module ChalmersGitlabFixing
     end
 
     # Polymorphic columns
-
-    def polymorphic_type_column(table, column)
-      stem = column.name.delete_suffix('_id')
-      return nil if stem == column.name
-
-      column_type_name = "#{stem}_type"
-      column_type = columns_for_table(table)[column_type_name]
-      return nil if column_type.nil?
-      return nil unless SQL.type_text?(column_type.sql_type)
-
-      column_type
-    end
 
     def column_polymorphic?(table, column)
       # Two different tests for polymorphism:

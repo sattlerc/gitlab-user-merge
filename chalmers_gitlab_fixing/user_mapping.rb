@@ -41,8 +41,8 @@ module ChalmersGitlabFixing
 
     TABLE_USER_MAPPING = '_search_keys'
     VERSION_COLUMN_USER_MAPPING = {
-      source: 'id',
-      target: 'original_id'
+      source: '_id',
+      target: '_original_id'
     }.freeze
 
     def with_table_user_mapping(&block)

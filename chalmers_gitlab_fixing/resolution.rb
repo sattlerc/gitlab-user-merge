@@ -457,10 +457,12 @@ module ChalmersGitlabFixing
     LOCKED = prefer_defaults { NEWEST }
 
     RESOLUTIONS = {
+      # TODO: check again.
       %w[notification_settings id] => IGNORE,
       %w[notification_settings created_at] => IGNORE,
       %w[notification_settings updated_at] => IGNORE,
 
+      # TODO: check again.
       %w[organization_users id] => IGNORE,
       %w[organization_users created_at] => IGNORE,
       %w[organization_users updated_at] => IGNORE,
@@ -468,7 +470,7 @@ module ChalmersGitlabFixing
       # Project authorizations.
       %w[project_authorizations access_level] => DO_NOT_RESOLVE,
       %w[project_authorizations_for_migration access_level] => DO_NOT_RESOLVE,
-      %w[user_details project_authorizations_recalculated_at] => DO_NOT_RESOLVE,
+      %w[user_details project_authorizations_recalculated_at] => IGNORE,
 
       %w[user_details location] => prefer_nondefaults { NEWEST },
       %w[user_details onboarding_status] => prefer_nondefaults { NEWEST },
