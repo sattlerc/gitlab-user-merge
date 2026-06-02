@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # JSON tools.
   module JSON
     def self.read(path)

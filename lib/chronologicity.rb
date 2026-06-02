@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Check if timestamps are in order.
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module Chronologicity
     include SQLExecution
     include UserMapping

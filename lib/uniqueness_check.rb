@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Scans for obstacles to merging of users.
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module UniquenessCheck
     include SQLExecution
     include UserMapping

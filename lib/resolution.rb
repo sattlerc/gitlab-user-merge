@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # Decision support for version conflicts.
   module Resolution
     ## Resolution actions

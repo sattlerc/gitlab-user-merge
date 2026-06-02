@@ -2,7 +2,7 @@
 
 # Cheap deserialization from JSON structures.
 # Not applicable to collections of classes.
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module Deserialization
     def deserialize(data)
       instance_values.each do |name, value|

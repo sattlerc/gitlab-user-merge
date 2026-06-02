@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Tools for working with the provided user mapping.
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module UserMapping
     include SQLExecution
 

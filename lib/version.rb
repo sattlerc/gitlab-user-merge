@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module Version
     VERSIONS = %i[source target].to_set
 

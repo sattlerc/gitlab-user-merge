@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module Replacement
     include SQLExecution
     include Models

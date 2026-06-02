@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # Writes and reads "column-classification.json" in current directory.
   # Can be overriden using environment variable PATH_COLUMN_CLASSIFICATION.
   PATH_COLUMN_CLASSIFICATION = ENV.fetch('PATH_COLUMN_CLASSIFICATION', 'column-classification.json')
 
-  # SQL = ChalmersGitlabFixing::SQL
+  # SQL = GitlabUserMerge::SQL
 
   # Classification of columns.
   # Possible match results:

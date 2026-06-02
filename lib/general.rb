@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # General utility methods.
   module General
     ## Sorting.

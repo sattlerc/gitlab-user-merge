@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   module Models
     def models_by_table
       h = tables.to_h { |table| [table, []] }

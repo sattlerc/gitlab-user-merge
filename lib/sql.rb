@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # Combinators for building SQL queries.
   module SQL
     ## Other utilities.

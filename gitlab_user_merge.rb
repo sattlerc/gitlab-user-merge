@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # Path constants.
   # PATH_JSON_ANALYSIS = '/home/sattler/mnt/analysis.json'
   # DIR_JSON_ANALYSIS = '/home/sattler/mnt/analysis'
@@ -31,31 +31,31 @@ require_relative 'lib/personal_projects'
 # require_relative 'lib/membership'
 
 module C
-  # include ChalmersGitlabFixing
+  # include GitlabUserMerge
 
-  # M = ChalmersGitlabFixing::Membership.new
+  # M = GitlabUserMerge::Membership.new
   # M.test
 
-  # C = ChalmersGitlabFixing::ColumnClassifier.new
+  # C = GitlabUserMerge::ColumnClassifier.new
   # File.open('/home/sattler/mnt/column-classification-report.txt', 'w') do |file|
   #   C.scan_and_write(file: file)
   # end
 
-  # chrono = ChalmersGitlabFixing::ChronologicityCheck.new
+  # chrono = GitlabUserMerge::ChronologicityCheck.new
   # File.open('/home/sattler/mnt/chronicity.txt', 'w') do |file|
   #   chrono.check(file: file, strict: false)
   # end
 
-  # U = ChalmersGitlabFixing::UniquenessCheck.new
+  # U = GitlabUserMerge::UniquenessCheck.new
   # U.check_for_unresolved_conflicts
   # U.print_resolution_queries
 
-  # P = ChalmersGitlabFixing::PersonalProjects.new
+  # P = GitlabUserMerge::PersonalProjects.new
   # P.report_namespace_projects
   # P.check_namespace_projects
   # P.transfer_personal_projects
 
-  # R = ChalmersGitlabFixing::Replacement.new
+  # R = GitlabUserMerge::Replacement.new
   # R.test
 
   # File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|

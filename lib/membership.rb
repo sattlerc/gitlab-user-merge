@@ -1,4 +1,4 @@
-module ChalmersGitlabFixing
+module GitlabUserMerge
   # Tools for membership merging analysis.
   class Membership
     include SQLExecution
