@@ -3,7 +3,7 @@
 # Tools for working with the provided user mapping.
 module ChalmersGitlabFixing
   module UserMapping
-    include ChalmersGitlabFixing::SQLExecution
+    include SQLExecution
 
     PATH_USER_MAPPING = ENV.fetch(
       'PATH_USER_MAPPING',

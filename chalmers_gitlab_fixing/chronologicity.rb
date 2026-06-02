@@ -3,17 +3,10 @@
 # Check if timestamps are in order.
 module ChalmersGitlabFixing
   module Chronologicity
-    include ChalmersGitlabFixing::SQLExecution
-    include ChalmersGitlabFixing::UserMapping
-    include ChalmersGitlabFixing::Models
-    include ChalmersGitlabFixing::WithColumnClassification
-
-    # def orders(version_user)
-    #   VERSIONS.map do |v|
-    #     w = General.from_singleton(VERSIONS - [v])
-    #     [[v, version_user[v]], [w, version_user[w]]]
-    #   end
-    # end
+    include SQLExecution
+    include UserMapping
+    include Models
+    include WithColumnClassification
 
     def no_activity(user)
       user.last_active_at < user.created_at + 1
@@ -53,7 +46,7 @@ module ChalmersGitlabFixing
       end
     end
 
-    # Outdated.
+    # Outdated below.
 
     CHONOLOGICITY_CHECKS = {
       %w[organization_users user_id] => %i[created_at updated_at],
@@ -82,7 +75,9 @@ module ChalmersGitlabFixing
         e << "created_at:#{format_time(user.created_at)}"
         e << "last_active_at:#{format_time(user.last_active_at)}"
         password_last_changed = user_detail(user.id).password_last_changed_at
-        e << "password_last_changed_at:#{format_time(password_last_changed)}" unless (password_last_changed - user.created_at).abs < 1
+        unless (password_last_changed - user.created_at).abs < 1
+          e << "password_last_changed_at:#{format_time(password_last_changed)}"
+        end
         identity_providers(user).entries.each do |provider, extern_uid|
           e << "#{provider}:#{extern_uid}"
         end
@@ -117,7 +112,9 @@ module ChalmersGitlabFixing
               next if values[:target].nil? || values[:source].nil? || values[:target] <= values[:source]
 
               e << [[table, time_column], values]
-              raise "Non-monotone table column #{table}.#{time_column} for #{format_version_user_detailed(version_user)}: #{values}" if strict
+              if strict
+                raise "Non-monotone table column #{table}.#{time_column} for #{format_version_user_detailed(version_user)}: #{values}"
+              end
             end
           end
         end.to_a

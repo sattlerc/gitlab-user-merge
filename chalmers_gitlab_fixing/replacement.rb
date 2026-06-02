@@ -1,26 +1,28 @@
 # frozen_string_literal: true
 
 module ChalmersGitlabFixing
-  class Replacement
+  module Replacement
     include SQLExecution
     include Models
     include UserMapping
     include WithColumnClassification
 
-    def replace_user_in_non_array_column_sql_query(table, column, polymorphic: false)
+    def replace_user_in_non_array_column_sql_query(table, column, polymorphic: false, &side_condition)
       SQL.spacing do |e|
         e << SQL::UPDATE
         e << SQL.identifier(table)
         e << SQL.set([[column, SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:target])]])
         e << SQL.from([TABLE_USER_MAPPING])
         e << SQL.where do |e1|
-          if polymorphic
-            e1 << SQL.equals(SQL.identifier(ColumnClassificationHelper.polymorphic_type_column(table, column), SQL.value('User')))
-          end
           e1 << SQL.equals(
             SQL.identifier(column),
             SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:source])
           )
+          if polymorphic
+            e1 << SQL.equals(SQL.identifier(ColumnClassificationHelper.polymorphic_type_column(table, column),
+                                            SQL.value('User')))
+          end
+          side_condition.call(e1) unless side_condition.nil?
         end
       end
     end
@@ -73,33 +75,6 @@ module ChalmersGitlabFixing
         query_replace = replace_user_sql_queries_for_array_cell(table, column, h, version_user_id)
         connection.execute(query_replace)
       end
-    end
-
-    def test
-      with_table_user_mapping do
-        test_array_column('issue_user_mentions', 'mentioned_users_ids')
-      end
-    end
-
-    # TODO
-    def replace_user_sql_queries_for_array_column(table, column, &block)
-      query = SQL.spacing do |e|
-        e << SQL::UPDATE
-        e << SQL.identifier(table)
-        e << SQL.set([[column, SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:target])]])
-        e << SQL.from([TABLE_USER_MAPPING])
-        e << SQL.where do |e1|
-          if polymorphic
-            e1 << SQL.equals(SQL.identifier(ColumnClassificationHelper.polymorphic_type_column(table, column), SQL.value('User')))
-          end
-          e1 << SQL.equals(
-            SQL.identifier(column),
-            SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:source])
-          )
-        end
-      end
-      puts query
-      block.call(query)
     end
   end
 end

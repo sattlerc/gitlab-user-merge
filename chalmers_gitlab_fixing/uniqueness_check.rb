@@ -2,13 +2,13 @@
 
 # Scans for obstacles to merging of users.
 module ChalmersGitlabFixing
-  class UniquenessCheck
-    include ChalmersGitlabFixing::SQLExecution
-    include ChalmersGitlabFixing::UserMapping
-    include ChalmersGitlabFixing::Models
-    include ChalmersGitlabFixing::WithColumnClassification
-    include ChalmersGitlabFixing::Chronologicity
-    include ChalmersGitlabFixing::WithResolutions
+  module UniquenessCheck
+    include SQLExecution
+    include UserMapping
+    include Models
+    include WithColumnClassification
+    include Chronologicity
+    include WithResolutions
 
     # These do not mention user ids.
     TABLE_INDEX_COLUMNS_IGNORE = [
@@ -156,9 +156,7 @@ module ChalmersGitlabFixing
             foreign_keys_by_column_for_table(table).fetch(user_column, []),
             allow_empty: true
           )
-          unless !foreign_key.nil? && foreign_key.options[:on_delete] == :cascade
-            e << [table, user_column]
-          end
+          e << [table, user_column] unless !foreign_key.nil? && foreign_key.options[:on_delete] == :cascade
         end
       end.to_set
     end
@@ -206,24 +204,6 @@ module ChalmersGitlabFixing
       end
     end
 
-    def keys_clause(keys)
-      SQL.anding do |e|
-        keys.entries.each do |key, value|
-          e << SQL.equals(SQL.identifier(key), SQL.value(value))
-        end
-      end
-    end
-
-    def select_unique_by_keys(table, keys)
-      query = SQL.spacing do |e|
-        e << SQL::SELECT
-        e << SQL::ALL
-        e << SQL.from(table)
-        e << SQL.where(keys_clause(keys))
-      end
-      select_unique(query)
-    end
-
     # Returns hash sending {source: key, target: key} to {column => {source: row[column], target: row[column]}}.
     def column_conflicts_for_index(table, index)
       user_column, other_columns = user_index(table, index)
@@ -235,18 +215,12 @@ module ChalmersGitlabFixing
 
         key = General.from_singleton(version_row.values.map(&:keys).to_set)
         values = key
-          .reject { |column| column == user_column }
-          .reject { |column| !resolution(table, column).nil? && resolution(table, column).ignore? }
-          .reject { |column| General.equal_strictly(*version_row.values.map { |row| row[column] }) }
-          .index_with { |column| version_row.transform_values { |row| row[column] } }
+                 .reject { |column| column == user_column }
+                 .reject { |column| !resolution(table, column).nil? && resolution(table, column).ignore? }
+                 .reject { |column| General.equal_strictly(*version_row.values.map { |row| row[column] }) }
+                 .index_with { |column| version_row.transform_values { |row| row[column] } }
         [version_keys, values]
       end.compact.to_h
-    end
-
-    def format_version_keys(version_keys)
-      SQL.format_symbol_hash(version_keys) do |value|
-        SQL.format_symbol_hash(value.transform_keys(&:intern))
-      end
     end
 
     def column_conflicts_by_table_uncached
@@ -276,6 +250,12 @@ module ChalmersGitlabFixing
       end
     end
 
+    def format_version_keys(version_keys)
+      SQL.format_symbol_hash(version_keys) do |value|
+        SQL.format_symbol_hash(value.transform_keys(&:intern))
+      end
+    end
+
     def column_conflicts_by_table_and_column_uncached
       column_conflicts_by_table.transform_values do |conflicts|
         separated = conflicts.entries.flat_map do |version_keys, values|
@@ -296,15 +276,17 @@ module ChalmersGitlabFixing
       @column_conflicts_by_table_and_column ||= column_conflicts_by_table_and_column_uncached
     end
 
-    def print_column_conflicts_by_table_and_column(file: $stdout, resolution: false)
-      file.puts '## Conflicts by table column'
+    def print_column_conflicts_by_table_and_column(file: $stdout, skip_resolved: false, include_resolution: false)
+      file.puts "## #{skip_resolved ? 'Unresolved conflicts' : 'Conflicts'} by table column"
       file.puts
-      if resolution
+      if !skip_resolved && resolution
         file.puts 'Resolution decisions are highlighted.'
         file.puts
       end
       column_conflicts_by_table_and_column.entries.each do |table, by_column|
         by_column.entries.each do |column, by_keys|
+          next if skip_resolved && !resolution(table, column).nil?
+
           c = columns_for_table(table)[column]
           file.puts "### Table column #{table}.#{column}"
           file.puts
@@ -314,7 +296,8 @@ module ChalmersGitlabFixing
           file.puts
           by_keys.entries.each do |version_keys, version_value|
             formatted_keys = format_version_keys(version_keys)
-            formatted_value = format_version_value(table, column, version_keys, version_value, resolution: resolution)
+            formatted_value = format_version_value(table, column, version_keys, version_value,
+                                                   resolution: include_resolution)
             file.puts "* #{formatted_keys}: #{formatted_value}"
           end
           file.puts
@@ -344,10 +327,10 @@ module ChalmersGitlabFixing
       @column_conflicts_by_version_user_id ||= column_conflicts_by_version_user_id_uncached
     end
 
-    def print_column_conflicts_by_version_user_id(file: $stdout, resolution: false)
-      file.puts '## Conflicts by user mapping'
+    def print_column_conflicts_by_version_user_id(file: $stdout, skip_resolved: false, include_resolution: false)
+      file.puts "## #{skip_resolved ? 'Unresolved conflicts' : 'Conflicts'} by user mapping}"
       file.puts
-      if resolution
+      if !skip_resolved && resolution
         file.puts 'Resolution decisions are highlighted.'
         file.puts
       end
@@ -363,7 +346,10 @@ module ChalmersGitlabFixing
             formatted_keys = format_version_keys(version_keys)
             file.puts "Keys #{formatted_keys}:"
             values.entries.each do |column, version_value|
-              formatted_value = format_version_value(table, column, version_keys, version_value, resolution: resolution)
+              next if skip_resolved && !resolution(table, column).nil?
+
+              formatted_value = format_version_value(table, column, version_keys, version_value,
+                                                     resolution: include_resolution)
               file.puts "* #{column}: #{formatted_value}"
             end
             file.puts
@@ -372,64 +358,47 @@ module ChalmersGitlabFixing
       end
     end
 
-    def resolution_sql_queries_for_table(table, &block)
-      column_conflicts_by_table[table].entries.each do |version_keys, values|
-        resolution_sql_queries_for_conflict(table, version_keys, values, &block)
-      end
-    end
-
-    def resolution_sql_queries(&block)
-      f = proc do |table|
-        resolution_sql_queries_for_table(table, &block)
-      end
-
-      # Delete from users table last to handle cascading deletion.
-      table_users, table_non_users = column_conflicts_by_table.keys.partition { |table| table == 'users' }
-      table_non_users.each(&f)
-      table_users.each(&f)
-    end
-
-    def print_resolution_queries(file: $stdout)
-      resolution_sql_queries do |query|
-        file.puts query
-      end
-    end
-
-    # Outdated from below.
-
-    # Relevant tables that share their primary key with that of the users table.
-    def table_columns_shared_primary_key_uncached
-      User.reflections.values.select do |reflection|
-        reflection.is_a?(ActiveRecord::Reflection::HasOneReflection)
-      end.map do |reflection|
-        model = reflection.class_name.constantize
-        table = model.table_name
-        puts [table, reflection.foreign_key].to_s
-        [table, reflection.foreign_key]
-      end.select do |table, column|
-        column == connection.primary_key(table) && relevant_columns.include?([table, column])
+    def unresolved_conflicts
+      @unresolved_conflicts ||= column_conflicts_by_table_and_column.entries.flat_map do |table, by_column|
+        by_column.keys.select { |column| resolution(table, column).nil? }.map do |column|
+          [table, column]
+        end
       end.to_set
     end
 
-    def table_columns_shared_primary_key
-      @tables_shared_primary_key ||= table_columns_shared_primary_key_uncached
+    def check_for_unresolved_conflicts(file: $stdout)
+      file.puts 'Checking for unresolved conflicts...'
+      return if unresolved_conflicts.empty?
+
+      file.puts
+      print_column_conflicts_by_table_and_column(file: file, skip_resolved: true)
+      raise "Unresolved conflicts: #{unresolved_conflicts}"
     end
 
-    def check_users_has_one_relations
-      User.reflections.values.each do |reflection|
-        next unless reflection.is_a?(ActiveRecord::Reflection::HasOneReflection)
+    def resolution_sql_queries_for_table(table, deletion: false, &block)
+      column_conflicts_by_table[table].entries.each do |version_keys, values|
+        resolution_sql_queries_for_conflict(table, version_keys, values, deletion: deletion, &block)
+      end
+    end
 
-        model = reflection.class_name.constantize
-        table = model.table_name
-        table_column = [table, reflection.foreign_key]
-        next unless relevant_columns.include?(table_column)
-        next if table_columns_shared_primary_key.include?(table_column)
-        next if relevant_unique_indexes.include?([table_column].to_set)
+    # If activated, deletes from users table last to handle cascading deletion.
+    #
+    # Note:
+    # Users should rather be deleted at application logic level (User.find(id).destroy!).
+    # The database logic misses some cascading deletions.
+    def resolution_sql_queries(delete_user: false, deletion: false, &block)
+      table_users, table_non_users = column_conflicts_by_table.keys.partition { |table| table == 'users' }
+      table_non_users.each do |table|
+        resolution_sql_queries_for_table(table, deletion: deletion, &block)
+      end
+      table_users.each do |table|
+        resolution_sql_queries_for_table(table, deletion: deletion && delete_user, &block)
+      end
+    end
 
-        # Special case: would have expected a unique index.
-        next if table_column == %w[namespaces owner_id]
-
-        raise "unexpected has-one relation for table users: #{table_column}"
+    def print_resolution_queries(deletion: false, file: $stdout)
+      resolution_sql_queries(deletion: deletion) do |query|
+        file.puts query
       end
     end
   end

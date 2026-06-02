@@ -1,14 +1,10 @@
 # frozen_string_literal: true
 
 module ChalmersGitlabFixing
-  class PersonalProjects
-    include ChalmersGitlabFixing::SQLExecution
-    include ChalmersGitlabFixing::UserMapping
-    include ChalmersGitlabFixing::Models
-
-    def format_project(project)
-      "#{project.id} (#{project.namespace.path}/#{project.path})"
-    end
+  module PersonalProjects
+    include SQLExecution
+    include UserMapping
+    include Models
 
     def report_personal_projects
       versions_user_id.each do |version_user_id|
@@ -37,7 +33,9 @@ module ChalmersGitlabFixing
       versions_user_id.each do |version_user_id|
         version_user = version_user_id.transform_values { |id| user(id) }
         version_namespace = version_user.transform_values(&:namespace)
-        version_projects = version_namespace.transform_values { |namespace| Project.where(namespace: namespace.id).index_by(&:path) }
+        version_projects = version_namespace.transform_values do |namespace|
+          Project.where(namespace: namespace.id).index_by(&:path)
+        end
 
         version_projects[:source].merge(version_projects[:target]) do |path, source_project, target_project|
           good = false

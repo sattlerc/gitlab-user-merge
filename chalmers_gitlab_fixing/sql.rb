@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
-# Requires a connection attribute reader.
 module ChalmersGitlabFixing
-  # Utilities for building SQL queries.
+  # Combinators for building SQL queries.
   module SQL
-
     ## Other utilities.
 
     def self.type_text?(type)
@@ -292,6 +290,14 @@ module ChalmersGitlabFixing
       end
     end
 
+    def self.keys_clause(keys)
+      SQL.anding do |e|
+        keys.entries.each do |key, value|
+          e << SQL.equals(SQL.identifier(key), SQL.value(value))
+        end
+      end
+    end
+
     SELECT = 'SELECT'
     UPDATE = 'UPDATE'
     DELETE = 'DELETE'
@@ -339,6 +345,16 @@ module ChalmersGitlabFixing
       r[0]
     end
 
+    def select_unique_by_keys(table, keys)
+      query = SQL.spacing do |e|
+        e << SQL::SELECT
+        e << SQL::ALL
+        e << SQL.from(table)
+        e << SQL.where(SQL.keys_clause(keys))
+      end
+      select_unique(query)
+    end
+
     def execute(&block)
       connection.execute(SQL.spacing(&block))
     end
@@ -374,7 +390,7 @@ module ChalmersGitlabFixing
 
     def primary_keys(table)
       primary_key = connection.primary_key(table)
-      primary_key = [primary_key] if String === primary_key
+      primary_key = [primary_key] if primary_key.is_a?(String)
       primary_key
     end
 
@@ -429,6 +445,18 @@ module ChalmersGitlabFixing
         .map { |foreign_key| foreign_key.options[:column] }
         .reject { |column| column.is_a?(Array) } # Partitioning based on [...]partition_id or runner_id.
         .to_set, allow_empty: true)
+    end
+
+    def polymorphic_type_column(table, column)
+      stem = column.name.delete_suffix('_id')
+      return nil if stem == column.name
+
+      column_type_name = "#{stem}_type"
+      column_type = columns_for_table(table)[column_type_name]
+      return nil if column_type.nil?
+      return nil unless SQL.type_text?(column_type.sql_type)
+
+      column_type
     end
   end
 end

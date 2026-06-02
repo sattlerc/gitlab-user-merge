@@ -606,8 +606,8 @@ module ChalmersGitlabFixing
   end
 
   module WithResolutions
-    include ChalmersGitlabFixing::Models
-    include ChalmersGitlabFixing::Chronologicity
+    include Models
+    include Chronologicity
 
     def resolutions_uncached
       General.transform_values_with_key(Resolution::RESOLUTIONS) do |(table, column), resolution_template|
@@ -629,7 +629,7 @@ module ChalmersGitlabFixing
       resolution(table, column).action(version_keys, version_value).format(version_value)
     end
 
-    def resolution_sql_queries_for_conflict(table, version_keys, values, &block)
+    def resolution_sql_queries_for_conflict(table, version_keys, values, deletion: false, &block)
       assignments = Enumerator.new do |e|
         values.entries.each do |column, version_value|
           resolution = resolution(table, column)
@@ -661,11 +661,12 @@ module ChalmersGitlabFixing
         end
         block.call(update)
       end
+      return unless deletion
 
       delete = SQL.spacing do |e|
         e << SQL::DELETE
         e << SQL.from(table)
-        e << SQL.where(keys_clause(version_keys[:source]))
+        e << SQL.where(SQL.keys_clause(version_keys[:source]))
       end
       block.call(delete)
     end

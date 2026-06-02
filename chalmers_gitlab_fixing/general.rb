@@ -61,7 +61,8 @@ module ChalmersGitlabFixing
     def self.hierarchy(entries, &block)
       r = General.group(entries.map(&block)) do |path, value|
         # puts "path #{path}: value #{value}"
-        raise "Ouch" if value.nil?
+        raise 'Ouch' if value.nil?
+
         if path.empty?
           [nil, value]
         else
@@ -70,9 +71,9 @@ module ChalmersGitlabFixing
           [first, [other, value]]
         end
       end
-      r.entries.each do |path, values|
+      r.entries.each do |_path, values|
         # puts "path #{path}: values #{values}"
-        raise "X" if values.include?(nil)
+        raise 'X' if values.include?(nil)
       end
       top = r.delete(nil) { [] }
       r.transform_values! { |es| hierarchy(es) }

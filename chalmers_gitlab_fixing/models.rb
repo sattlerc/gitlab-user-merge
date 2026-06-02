@@ -13,7 +13,7 @@ module ChalmersGitlabFixing
     end
 
     def model_for_table(table)
-      return General.from_singleton(models_by_table[table])
+      General.from_singleton(models_by_table[table])
     end
 
     def user(id)

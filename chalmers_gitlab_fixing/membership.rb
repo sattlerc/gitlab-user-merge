@@ -1,5 +1,5 @@
 module ChalmersGitlabFixing
-  # Tools for membership merging.
+  # Tools for membership merging analysis.
   class Membership
     include SQLExecution
     include Models
@@ -170,13 +170,12 @@ module ChalmersGitlabFixing
       versions_user_id.each do |version_user_id|
         memberships = version_memberships(version_user_id).values.flatten(1)
 
-        _remaining, redundant = prune(memberships)
+        remaining, redundant = prune(memberships)
         next if redundant.empty?
 
         sels = prune_memberships_hereditary(memberships, strict: true)
         sels_weak = prune_memberships_hereditary(memberships, strict: false)
-        puts "selected: #{sels.length} vs #{sels_weak.length} vs #{_remaining.length}"
-
+        puts "selected: #{sels.length} vs #{sels_weak.length} vs #{remaining.length}"
 
         puts "Redundant memberships for user mapping #{format_version_user_id(version_user_id)}:"
         redundant.entries.each do |m, orig|
@@ -189,11 +188,11 @@ module ChalmersGitlabFixing
     def test
       print_redundant_memberships
 
-      #check_members_attributes
-      #return
+      # check_members_attributes
+      # return
 
-      #print_project_memberships
-      #r = General.hierarchy([[['a'], 1], [['a', 'b'], 2], [[], 3]])
+      # print_project_memberships
+      # r = General.hierarchy([[['a'], 1], [['a', 'b'], 2], [[], 3]])
     end
   end
 end
