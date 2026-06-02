@@ -55,6 +55,24 @@ module ChalmersGitlabFixing
       end
     end
 
+    # Take the minimum of the two conflicting values.
+    # Useful for columns like created_at.
+    class ActionMin < Action
+      def combine(version_value)
+        raise 'no value given' if version_value.empty?
+
+        version_value.compact.values.min
+      end
+
+      def combine_sql(version_fragment)
+        raise 'no fragment given' if version_fragment.empty?
+
+        SQL.function('LEAST', *version_fragment.values)
+      end
+    end
+
+    ACTION_MIN = ActionMin.new
+
     # Take the maximum of the two conflicting values.
     # Useful for columns like projects_limit.
     class ActionMax < Action
@@ -400,6 +418,7 @@ module ChalmersGitlabFixing
       end
     end
 
+    MIN = constant(ACTION_MIN)
     MAX = constant(ACTION_MAX)
     SUM = constant(ACTION_SUM)
 
@@ -457,20 +476,24 @@ module ChalmersGitlabFixing
     LOCKED = prefer_defaults { NEWEST }
 
     RESOLUTIONS = {
-      # TODO: check again.
       %w[notification_settings id] => IGNORE,
-      %w[notification_settings created_at] => IGNORE,
-      %w[notification_settings updated_at] => IGNORE,
+      %w[notification_settings created_at] => MIN,
+      %w[notification_settings updated_at] => MAX,
 
-      # TODO: check again.
       %w[organization_users id] => IGNORE,
-      %w[organization_users created_at] => IGNORE,
-      %w[organization_users updated_at] => IGNORE,
+      %w[organization_users created_at] => MIN,
+      %w[organization_users updated_at] => MAX,
 
       # Project authorizations.
-      %w[project_authorizations access_level] => DO_NOT_RESOLVE,
-      %w[project_authorizations_for_migration access_level] => DO_NOT_RESOLVE,
+      # Cache table, we recalculate this later.
+      %w[project_authorizations access_level] => IGNORE,
+      %w[project_authorizations_for_migration access_level] => IGNORE,
       %w[user_details project_authorizations_recalculated_at] => IGNORE,
+
+      # User highest roles.
+      # Cache table, we recalculate this later.
+      %w[user_highest_roles highest_access_level] => IGNORE,
+      %w[user_highest_roles updated_at] => IGNORE,
 
       %w[user_details location] => prefer_nondefaults { NEWEST },
       %w[user_details onboarding_status] => prefer_nondefaults { NEWEST },
@@ -478,9 +501,6 @@ module ChalmersGitlabFixing
       %w[user_details pronunciation] => prefer_nondefaults(defaults: ['', nil]) { NEWEST },
       %w[user_details webauthn_xid] => prefer_nondefaults { NEWEST },
       %w[user_details website_url] => prefer_nondefaults(defaults: ['', nil]) { NEWEST },
-
-      %w[user_highest_roles highest_access_level] => DO_NOT_RESOLVE,
-      %w[user_highest_roles updated_at] => IGNORE,
 
       %w[user_preferences id] => IGNORE,
       %w[user_preferences created_at] => TARGET,
