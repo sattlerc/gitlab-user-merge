@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 module ChalmersGitlabFixing
-  PATH_COLUMN_CLASSIFICATION = ENV.fetch(
-    'PATH_COLUMN_CLASSIFICATION',
-    '/home/sattler/mnt/notes/column-classification.json'
-  )
+  # Writes and reads "column-classification.json" in current directory.
+  # Can be overriden using environment variable PATH_COLUMN_CLASSIFICATION.
+  PATH_COLUMN_CLASSIFICATION = ENV.fetch('PATH_COLUMN_CLASSIFICATION', 'column-classification.json')
 
   # SQL = ChalmersGitlabFixing::SQL
 

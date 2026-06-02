@@ -8,27 +8,32 @@ module ChalmersGitlabFixing
   # DIR_TEXT = '/home/sattler/mnt/text'
 end
 
-# change to require_relative
-$LOAD_PATH.unshift File.dirname(__FILE__)
-load 'chalmers_gitlab_fixing/general.rb'
-load 'chalmers_gitlab_fixing/deserialization.rb'
-load 'chalmers_gitlab_fixing/json.rb'
-load 'chalmers_gitlab_fixing/sql.rb'
-load 'chalmers_gitlab_fixing/models.rb'
-load 'chalmers_gitlab_fixing/version.rb'
-load 'chalmers_gitlab_fixing/user_mapping.rb'
-load 'chalmers_gitlab_fixing/personal_projects.rb'
-load 'chalmers_gitlab_fixing/column_classification.rb'
-load 'chalmers_gitlab_fixing/chronologicity.rb'
-load 'chalmers_gitlab_fixing/resolution.rb'
-load 'chalmers_gitlab_fixing/uniqueness_check.rb'
-load 'chalmers_gitlab_fixing/membership.rb'
-load 'chalmers_gitlab_fixing/replacement.rb'
+require_relative 'lib/general'
+require_relative 'lib/deserialization'
+require_relative 'lib/json'
+require_relative 'lib/sql'
+require_relative 'lib/version'
+require_relative 'lib/models'
+
+# Reads from PATH_USER_MAPPING.
+require_relative 'lib/user_mapping'
+
+# Writes to and reads from PATH_COLUMN_CLASSIFICATION.
+require_relative 'lib/column_classification'
+
+require_relative 'lib/chronologicity'
+require_relative 'lib/resolution'
+require_relative 'lib/uniqueness_check'
+require_relative 'lib/replacement'
+require_relative 'lib/personal_projects'
+
+# Unused in production.
+# require_relative 'lib/membership'
 
 module C
   # include ChalmersGitlabFixing
 
-  M = ChalmersGitlabFixing::Membership.new
+  # M = ChalmersGitlabFixing::Membership.new
   # M.test
 
   # C = ChalmersGitlabFixing::ColumnClassifier.new
@@ -41,16 +46,17 @@ module C
   #   chrono.check(file: file, strict: false)
   # end
 
-  U = ChalmersGitlabFixing::UniquenessCheck.new
+  # U = ChalmersGitlabFixing::UniquenessCheck.new
+  # U.check_for_unresolved_conflicts
   # U.print_resolution_queries
 
-  P = ChalmersGitlabFixing::PersonalProjects.new
+  # P = ChalmersGitlabFixing::PersonalProjects.new
   # P.report_namespace_projects
   # P.check_namespace_projects
   # P.transfer_personal_projects
 
-  R = ChalmersGitlabFixing::Replacement.new
-  R.test
+  # R = ChalmersGitlabFixing::Replacement.new
+  # R.test
 
   # File.open('/home/sattler/mnt/column_conflicts_by_user_id.txt', 'w') do |file|
   #   U.print_column_conflicts_by_version_user_id(file: file, resolution: true)

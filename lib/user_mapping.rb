@@ -5,10 +5,10 @@ module ChalmersGitlabFixing
   module UserMapping
     include SQLExecution
 
-    PATH_USER_MAPPING = ENV.fetch(
-      'PATH_USER_MAPPING',
-      '/home/sattler/mnt/user-mapping.json'
-    )
+    # Requires "user-mapping.json" in current directory.
+    # Can be overriden using environment variable PATH_USER_MAPPING.
+    # This is a JSON object sending source user ids (merge source) to target user id (merge target).
+    PATH_USER_MAPPING = ENV.fetch('PATH_USER_MAPPING', 'user-mapping.json')
 
     def user_mapping
       @user_mapping ||= JSON.read(PATH_USER_MAPPING).transform_keys(&:to_i)
