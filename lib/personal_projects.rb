@@ -86,14 +86,18 @@ module GitlabUserMerge
       puts 'Refreshing project authorizations...'
       worker = AuthorizedProjectsWorker.new
       versions_user_id.each do |version_user_id|
-        worker.perform(version_user_id[:target])
+        version_user_id.values.each do |user_id|
+          worker.perform(user_id)
+        end
       end
     end
 
     def refresh_user_highest_roles
       puts 'Refreshing user highest roles...'
       versions_user_id.each do |version_user_id|
-        Users::UpdateHighestMemberRoleService.new(user(version_user_id[:target])).execute
+        version_user_id.values.each do |user_id|
+          Users::UpdateHighestMemberRoleService.new(user(user_id)).execute
+        end
       end
     end
   end
