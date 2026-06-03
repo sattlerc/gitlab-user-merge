@@ -283,6 +283,14 @@ module GitlabUserMerge
       end
     end
 
+    def self.group_by(column)
+      spacing do |e|
+        e << 'GROUP'
+        e << 'BY'
+        e << identifier(column)
+      end
+    end
+
     def self.limit(limit: 1)
       spacing do |e|
         e << 'LIMIT'
@@ -304,6 +312,10 @@ module GitlabUserMerge
 
     DISTINCT = 'DISTINCT'
     ALL = '*'
+
+    IS = 'IS'
+    NOT = 'NOT'
+    NULL = 'NULL'
 
     def self.create(table, columns, temporary: false)
       spacing do |e|
@@ -395,15 +407,18 @@ module GitlabUserMerge
     end
 
     def first_primary_key(table)
-      primary_keys(table)[0]
+      keys = primary_keys(table)
+      return nil if keys.nil?
+
+      keys[0]
     end
 
     def row_id(table, column)
       key = first_primary_key(table)
       if !key.nil?
-        function('min', SQL.identifier(key))
+        SQL.function('min', SQL.identifier(key))
       else
-        spacing do |e|
+        SQL.spacing do |e|
           e << SQL.function('ROW_NUMBER')
           e << 'OVER'
           e << SQL.parens do |e1|
