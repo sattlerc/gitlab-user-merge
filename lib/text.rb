@@ -61,6 +61,24 @@ module GitlabUserMerge
       %w[work_item_descriptions description_html],
     ].to_set
 
+    def check_text_array_columns(file: $stdout)
+      file.puts 'Scanning text array columns...'
+      file.puts
+
+      inhabited_tables.each do |table|
+        connection.columns(table).each do |column|
+          next unless SQL.type_text?(column.sql_type)
+          next unless column.sql_type_metadata.sql_type == "#{column.sql_type}[]"
+
+          file.puts "Scanning #{table}.#{column.name}..."
+          connection.select_rows(sql_query_group_non_null(table, column.name)).each do |_id, value|
+            file.puts "* #{value}"
+          end
+          puts
+        end
+      end
+    end
+
     def check_text_columns(file: $stdout)
       file.puts 'Scanning text columns for:'
       file.puts '* integers matching duplicated user ids,'
@@ -73,6 +91,9 @@ module GitlabUserMerge
         connection.columns(table).each do |column|
           table_column = [table, column.name]
           next unless SQL.type_text?(column.sql_type)
+          next if column.sql_type_metadata.sql_type == "#{column.sql_type}[]"
+          raise unless column.sql_type_metadata.sql_type == column.sql_type
+
           next if TEXT_COLUMNS_EXCLUDE.include?(table_column)
 
           puts "Scanning #{table}.#{column.name}..."
@@ -136,6 +157,7 @@ module GitlabUserMerge
       inhabited_tables.each do |table|
         connection.columns(table).each do |column|
           next unless column.sql_type == 'jsonb'
+          raise unless column.sql_type_metadata.sql_type == column.sql_type
 
           file.puts "Scanning #{table}.#{column.name}..."
 
