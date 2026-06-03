@@ -7,6 +7,9 @@ module GitlabUserMerge
     include Models
 
     def report_personal_projects
+      puts 'Printing personal projects...'
+      puts
+
       versions_user_id.each do |version_user_id|
         version_user = version_user_id.transform_values { |id| user(id) }
         version_namespace = version_user.transform_values(&:namespace)
@@ -79,8 +82,6 @@ module GitlabUserMerge
         check_no_personal_projects_for_user_id(version_user_id[:source])
       end
     end
-
-    # TODO: move elsewhere
 
     def refresh_project_authorizations
       puts 'Refreshing project authorizations...'

@@ -36,6 +36,58 @@ module GitlabUserMerge
     include UniquenessCheck
     include Replacement
     include Text
+
+    PATH_COLUMN_CONFLICTS_BY_VERSION_USER_ID = ENV.fetch('PATH_COLUMN_CONFLICTS_BY_VERSION_USER_ID', 'column_conflicts_by_version_user_id.txt')
+    PATH_COLUMN_CONFLICTS_BY_TABLE_AND_COLUMN = ENV.fetch('PATH_COLUMN_CONFLICTS_BY_TABLE_AND_COLUMN', 'column_conflicts_by_table_and_column.txt')
+
+    def perform_column_classification
+      ColumnClassifier.new.scan_and_write
+    end
+
+    def check_text_and_json_columns
+      check_text_array_columns
+      check_text_columns
+      check_json_columns
+    end
+
+    # check_for_unresolved_conflicts
+
+    def print_conflict_resolutions
+      File.open(PATH_COLUMN_CONFLICTS_BY_VERSION_USER_ID, 'w') do |file|
+        print_column_conflicts_by_version_user_id(file: file, resolution: true)
+      end
+      File.open(PATH_COLUMN_CONFLICTS_BY_TABLE_AND_COLUMN, 'w') do |file|
+        print_column_conflicts_by_table_and_column(file: file, resolution: true)
+      end
+    end
+
+    def perform_conflict_resolution(perform: false)
+      check_for_unresolved_conflicts
+      # TODO
+    end
+
+    def perform_user_merge(perform: false)
+      # TODO
+    end
+
+    def perform_personal_projects_transfer(perform: false)
+      report_personal_projects
+      check_personal_projects_for_conflict
+      return unless perform
+
+      transfer_personal_projects
+      check_personal_projects_clear
+      refresh_project_authorizations
+      refresh_user_highest_roles
+    end
+
+    def delete_source_users(perform: false)
+      return unless perform
+
+      duplicated_users.each do |user|
+        user.destroy!
+      end
+    end
   end
 end
 
@@ -46,10 +98,6 @@ module C
 
   instance = Instance.new
   instance.check_text_array_columns
-
-  # File.open('/home/sattler/mnt/column-classification-report.txt', 'w') do |file|
-  #   instance.scan_and_write(file: file)
-  # end
 
   # File.open('/home/sattler/mnt/chronicity.txt', 'w') do |file|
   #   instance.check(file: file, strict: false)
