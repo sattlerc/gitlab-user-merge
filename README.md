@@ -278,7 +278,7 @@ We want to handle these conflicts in a way that defaults to the most useful vers
     
     Any entry with `resolution MISSING` denotes an unresolved conflict.
     Resolve these conflicts at table column level by choosing a resolution and adding it to the hash `RESOLUTIONS` in [`lib/resolution.rb`](lib/resolution.rb).
-    Some example resolutions have already been made (as highlighted the reports), but you should revisit those.
+    Some example resolutions have already been made (with resulting actions highlighted the reports), but you should double-check the entire hash.
     
     Restart the GitLab Rails console and reload the codebase.
     You may go back to the beginning of this step to see how your conflicts resolve with your resolution decisions.
