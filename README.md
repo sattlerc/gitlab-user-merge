@@ -3,6 +3,8 @@
 This experimental codebase facilitates transparent merging of users in a self-hosted GitLab installation.
 I was not able to find existing code for this problem, so I wrote my own (learning more about Ruby and GitLab in the process...).
 
+Tested with GitLab 18.8.
+
 ## Description
 
 * The tool works by making changes to the GitLab database.
@@ -22,8 +24,6 @@ I was not able to find existing code for this problem, so I wrote my own (learni
 
 * URLs to personal projects of merged users remain valid due to GitLab's route redirect mechanism.
   In particular, no remotes in git projects have to be updated.
-
-The tool has been tested with GitLab 18.8.
 
 The below guide explains the workflow of using the tool.
 
