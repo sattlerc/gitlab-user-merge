@@ -3,17 +3,32 @@
 This experimental codebase facilitates transparent merging of users in a self-hosted GitLab installation.
 I was not able to find existing code for this problem, so I wrote my own (learning more about Ruby and GitLab in the process...).
 
-The tool only makes changes to the GitLab database.
-The merge should be transparent at this level: no reference to ids of merged users remain.
-Of course, external references to users may break.
-URLs to personal projects remain valid due to GitLab's route redirect mechanism.
+## Description
 
-The below guide explains the workflow of using tool.
+* The tool works by making changes to the GitLab database.
+  The merge is transparent at this level: if successful, no reference to ids of merged users remain in the database.
+
+* This means that all aspects of duplicated users are preserved:
+  - account information and preferences (with a specified conflict resolution, see below),
+  - SSH keys, authentication tokens, etc.,
+  - project and group memberships,
+  - notification subscriptions (in discussions, issues, merge requests, etc.),
+  - statistics and audit reports,
+  - etc.
+
+* External references to merged users will break.
+  In particular, users will no longer be able to log in using their duplicate account name.
+  This is not a problem in setups when users log in using an external provider (the most common cause of account duplication).
+
+* URLs to personal projects of merged users remain valid due to GitLab's route redirect mechanism.
+  In particular, no remotes in git projects have to be updated.
+
+The below guide explains the workflow of using the tool.
 
 ## Stop GitLab
 
 The tool should only be used on an instance of GitLab that has been shut down properly.
-You can do this using `gitlab-ctl stop` (this might take a while to finish).
+You can do this using `gitlab-ctl stop`.
 
 Only the PostgreSQL service should be running: `gitlab-ctl start postgresql`.
 
@@ -35,7 +50,7 @@ down: sidekiq: 327s, normally up; run: log: (pid 2544) 1180592s
 
 ## Make a database backup
 
-Back your database up before running the destructive parts of this codebase:
+Back your database up before running destructive parts of this codebase:
 
 ```bash
 gitlab-rake gitlab:backup:db:create
@@ -51,7 +66,7 @@ zcat /var/opt/gitlab/backups/db/database.sql.gz | gitlab-psql -q
 
 You might have to run the drop statements repeatedly to make sure all inherited constraints are dropped.
 
-You not restore from this image after starting GitLab up again.
+You must not restore from this image after starting GitLab up again.
 Database backups in isolation are only good for restoration at their point in time.
 (For example, file storage and repositories might get out of sync.)
 
@@ -63,7 +78,7 @@ You can start the [GitLab Rails console](https://docs.gitlab.com/administration/
 This console is an interactive Ruby shell that gives direct access to the internals of GitLab.
 It sits right at the application logic level, below the admin user interface and above the database layer.
 
-Clone this repository onto your machine running GitLab.
+Clone this repository onto the machine running your GitLab instance.
 Make sure that the user running the GitLab Rails console (`gitlab-rails console`) has read access to this codebase.
 You can confirm this user by running `Etc.getpwuid` in the GitLab Rails console.
 In my case, this is user `git`.
@@ -73,8 +88,6 @@ In the GitLab Rails console, you can then load this codebase as follows:
 load '<path to codebase>/gitlab_merge_tool.rb'
 ```
 
-**Note:** If you edit the codebase and want to load there changes, you need to restart the GitLab Rails console.
-
 The entire codebase is namespaced to module `GitlabUserMerge`.
 All the high-level functionality is exposed via the class `GitlabUserMerge::Tool`.
 Create an instance of this class for further use below:
@@ -83,11 +96,15 @@ Create an instance of this class for further use below:
 tool = GitlabUserMerge::Tool.new
 ```
 
+**Note:**
+If you edit and reload the codebase, make sure to run this line again.
+Otherwise, `tool` will still be outdated.
+
 ### Set up working directory
 
-The GitLab user merge tool reads and produces various intermediate files and report files and directories.
+The tool reads and produces various intermediate files as well as report files and directories.
 Create a working directory that the GitLab Rails console user can create files in.
-When we refer to files and directories below, they should be in this directory.
+When we refer to files and directories below, it is relative to this directory.
 
 Before running any functions from the codebase, change to this directory in the GitLab Rails console:
 
@@ -97,16 +114,15 @@ Dir.chdir('<path to working directory>')
 
 **Note**:
 It does not seem possible to directly start the GitLab Rails console in a given directory.
-In always starts in `/opt/gitlab/embedded/service/gitlab-rails`.
-So I do not know how to avoid this change of directories in the GitLab Rails console.
+It always starts in `/opt/gitlab/embedded/service/gitlab-rails`.
 
 ### Files read and written
 
-The codebase exposes both low-level and high-level functions for analyzing and handling user merging.
+The codebase exposes both low-level and high-level functions for analyzing and handling user merges.
 The high-level functions read and write caching data and reports into certain files and directories.
 These default to sensible names in the current working directory.
 You can overwrite these by passing environment variables.
-See the beginning of `gitlab_user_merge.rb` for all of these path constants.
+These are documented at the beginning of `gitlab_user_merge.rb`.
 Alternatively, you can call a lower level functions and pass the path directly.
 
 ## Input: user mapping
@@ -116,7 +132,7 @@ This maps *source* user id (merge source) to *target* user id (merge target).
 All of these ids are required to be pairwise distinct.
 You can handle merging of larger sets of users by iterated merging.
 
-Provide the user mapping as JSON file `user-mapping.json`.
+Provide the user mapping as a JSON file `user-mapping.json`.
 For example:
 
 ```json
@@ -127,7 +143,7 @@ For example:
 }
 ```
 
-Here is a [script](https://git.chalmers.se/sattler/chalmers-gitlab-fixing/-/blob/main/duplicated_users.py) that produces this file by searching for users with shared external user id (for different providers):
+If you have access to Chalmers GitLab, here is a [script](https://git.chalmers.se/sattler/chalmers-gitlab-fixing/-/blob/main/duplicated_users.py) that produces this file by searching for users with shared external user id (for different providers):
 
 ```shell
 ./duplicated_users.py --json >user-mapping.json
@@ -135,8 +151,8 @@ Here is a [script](https://git.chalmers.se/sattler/chalmers-gitlab-fixing/-/blob
 
 ## Column classification
 
-The first complication is figuring out which database table columns refer to user ids.
-For this, we produce a column classification.
+The first complication is figuring out which database table columns refer to duplicated user ids.
+For this, we produce a *column classification*.
 Note that a column classification is only valid for the user mapping it was produced from.
 
 ### Workflow
@@ -148,7 +164,7 @@ Note that a column classification is only valid for the user mapping it was prod
     ```
 
     This will produce a file `column-classification.json` and a report `column-classification.txt`.
-    It might take a while to run.
+    It might take a while to run (about half a minute for me).
 
 2)  Manually handle any table columns marked *unrecognized* in of the following ways:
     * Edit `column-classification.json`, moving them from *unrecognized* to *positive* or *negative* as appropriate.
@@ -157,7 +173,7 @@ Note that a column classification is only valid for the user mapping it was prod
 
 ### Background (skippable)
 
-This is handled in [`lib/column_classification.rb`](lib/column_classification.rb).
+Column classification is implemented in [`lib/column_classification.rb`](lib/column_classification.rb).
 
 #### Positive criteria
 
@@ -201,7 +217,7 @@ The following ones are currently hard-coded:
 
 ## Checking JSON and text columns for references to duplicated users
 
-This is an optional step going beyond the database schema.
+This is an optional step that goes beyond the database schema.
 The tool supports checking for:
 * duplicated usernames and user ids as values and keys in JSON data (either a JSON column or a text column parsable as JSON),
 * duplicated usernames contained in text column values.
@@ -214,13 +230,13 @@ The tool supports checking for:
     tool.check_text_and_json_columns
     ```
 
-    This will take a while to run.
-    It will create the following reports with all matches:
+    This will take a while to run (about a minute for me).
+    It will create the following reports with all the unique matches:
     * `columns-json-report.txt` (matches are given together with their key/index path in the JSON),
     * `columns-text-report.txt` (ignoring some excluded table columns, see background),
     * `columns-text-array-report.txt`.
 
-    It will also create the following directories with entries for each unique matching column values:
+    It will also create the following directories with the full entries (and the matching user ids and usernames as part of the filename):
     * `columns-json`,
     * `columns-text`.
 
@@ -228,12 +244,12 @@ The tool supports checking for:
 
 ### Background (skippable)
 
-This is handled in [`lib/text.rb`](lib/text.rb).
+This is implemented in [`lib/text.rb`](lib/text.rb).
 
-The set `TEXT_COLUMNS_EXCLUDE` contains text table column that I analysed and concluded need not to be touched.
+The set `TEXT_COLUMNS_EXCLUDE` contains text columns that I analysed and concluded need not to be touched.
 We intentionally leave contents of notes and descriptions of merge requests, issues, etc., intact.
 The parsing for usernames by Gitlab in order to create notification settings happens only when such a text is initially created.
-These are migrated properly by the tool.
+These are already migrated properly by the tool as part of the usual workflow.
 Namespace path or route references are also unproblematic.
 
 ## Handling conflicts
@@ -242,7 +258,7 @@ A *conflict* in a table with a unique index (or primary key) is a pair of a *sou
 These conflicts need to be resolved in a systematic way before merging of users can proceed.
 
 Typical conflicts involve tables concerned with user information: `users`, `user_details`, `user_preferences`.
-For example, a duplicated user may have set a password in one of their accounts but have an autogenerated password in their other account.
+For example, a duplicated user may have set a password in one of their accounts, but have an autogenerated password in their other account.
 We want to handle these conflicts in a way that defaults to the most useful version.
 
 ### Workflow
@@ -275,7 +291,7 @@ We want to handle these conflicts in a way that defaults to the most useful vers
 
 ### Background (skippable)
 
-Conflict detection is handled in [`lib/uniqueness_check.rb`](lib/uniqueness_check.rb).
+Conflict detection is implemented in [`lib/uniqueness_check.rb`](lib/uniqueness_check.rb).
 The resolution logic is implemented in [`lib/resolution.rb`](lib/resolution.rb).
 Several strategies already implemented (taking a specified version, summing, maximum, preferring non-defaults defaults, chaining of strategies, custom strategy for passwords, etc.).
 
