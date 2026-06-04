@@ -351,7 +351,7 @@ This is implemented in [`lib/personal_projects.rb`](lib/personal_projects.rb).
 
 ### Workflow
 
-1)  Perform a dry run user merge:
+1)  Perform a dry-run user merge:
 
     ```ruby
     tool.perform_user_merge(perform: false)
