@@ -372,7 +372,12 @@ This is implemented in [`lib/personal_projects.rb`](lib/personal_projects.rb).
 ### Background
 
 User merging involves two kinds of database updates:
+
 * Merge conflict rows according to the configured resolutions (and deleting the source rows afterwards).
+  - For columns involved in unique indexes (or primary keys), we cannot simply copy the column value from source to target.
+    Currently, we hard-code the string table columns for which that is the case (`unique_table_columns` in `perform_conflict_resolution_for_conflict` in `lib/resolution.rb`).
+    We workaround the problem by prefixing the source value with a unique string to free it up for the target value.
+
 * Replace user ids in the database according to the user mapping.
   - We of course ignore the column `users.id`.
   - We also ignore in the column and the column `owner_id` in table `namespaces` whenever column `type` has value `User`.
