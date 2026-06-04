@@ -22,9 +22,16 @@ module GitlabUserMerge
       @user[id]
     end
 
+    def user_detail_uncached(user_id)
+      r = UserDetail.select { |m| m.user_id == user_id }.to_a
+      raise "no user details for user id #{user_id}" if r.empty?
+
+      General.from_singleton(r)
+    end
+
     def user_detail(user_id)
       @user_detail ||= {}
-      @user_detail[user_id] ||= General.from_singleton(UserDetail.select { |m| m.user_id == user_id }.to_a)
+      @user_detail[user_id] ||= user_detail_uncached(user_id)
       @user_detail[user_id]
     end
 

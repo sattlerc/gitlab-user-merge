@@ -1,8 +1,5 @@
 module GitlabUserMerge
-  DIR_JSON = ENV.fetch('DIR_JSON', 'json')
-  DIR_TEXT = ENV.fetch('DIR_TEXT', 'text')
-
-  class Text
+  module Text
     include SQLExecution
     include UserMapping
 
@@ -41,7 +38,7 @@ module GitlabUserMerge
       %w[identities extern_uid],
       %w[issues description],
       %w[issues description_html],
-      %w[merge_request_diff_commits message],      
+      %w[merge_request_diff_commits message],
       %w[merge_request_diff_files diff],
       %w[merge_request_diff_files_99208b8fac diff],
       %w[merge_requests description],
@@ -58,12 +55,12 @@ module GitlabUserMerge
       %w[users email],
       %w[users username],
       %w[work_item_descriptions description],
-      %w[work_item_descriptions description_html],
+      %w[work_item_descriptions description_html]
     ].to_set
 
     def check_text_array_columns(file: $stdout)
-      file.puts 'Scanning text array columns...'
-      file.puts
+      puts 'Scanning text array columns...'
+      puts
 
       inhabited_tables.each do |table|
         connection.columns(table).each do |column|
@@ -74,18 +71,21 @@ module GitlabUserMerge
           connection.select_rows(sql_query_group_non_null(table, column.name)).each do |_id, value|
             file.puts "* #{value}"
           end
-          puts
+          file.puts
         end
       end
     end
 
-    def check_text_columns(file: $stdout)
-      file.puts 'Scanning text columns for:'
-      file.puts '* integers matching duplicated user ids,'
-      file.puts '* strings containing duplicated usernames.'
-      file.puts
-      file.puts "Matching text values will be stored in #{DIR_TEXT}..."
-      file.puts
+    def check_text_columns(file: $stdout, dir: DIR_COLUMN_TEXT, dir_json: DIR_COLUMN_JSON)
+      puts 'Scanning text columns for:'
+      puts '* integers matching duplicated user ids,'
+      puts '* strings containing duplicated usernames.'
+      puts
+      puts "Matching text values will be stored in #{dir}"
+      puts "Text values parsing as JSON will be handled as JSON, with matches stored in #{dir_json}..."
+      puts
+
+      FileUtils.mkdir_p(dir)
 
       inhabited_tables.each do |table|
         connection.columns(table).each do |column|
@@ -96,7 +96,7 @@ module GitlabUserMerge
 
           next if TEXT_COLUMNS_EXCLUDE.include?(table_column)
 
-          puts "Scanning #{table}.#{column.name}..."
+          file.puts "Scanning #{table}.#{column.name}..."
 
           matching_ids = Set.new
           matching_usernames = Set.new
@@ -112,7 +112,7 @@ module GitlabUserMerge
               search = JSONContextSearch.new(
                 json,
                 filter_integer: json_filter_integer,
-                filter_string: json_filter_string,
+                filter_string: json_filter_string
               )
               next if search.integers.empty? && search.strings.empty?
 
@@ -121,7 +121,7 @@ module GitlabUserMerge
               matching_usernames |= search.strings.keys
 
               suffix = "-#{search.integers.keys.join(',')}-#{search.strings.keys.join(',')}"
-              path = "#{DIR_JSON}/#{table}.#{column.name}/#{id}#{suffix}"
+              path = "#{dir_json}/#{table}.#{column.name}/#{id}#{suffix}"
               FileUtils.mkdir_p(File.dirname(path))
               JSON.write(path, json)
             else
@@ -132,7 +132,7 @@ module GitlabUserMerge
               matching_usernames |= strings
 
               suffix = "-#{strings.join(',')}"
-              path = "#{DIR_TEXT}/#{table}.#{column.name}/#{id}#{suffix}"
+              path = "#{dir}/#{table}.#{column.name}/#{id}#{suffix}"
               FileUtils.mkdir_p(File.dirname(path))
               File.open(path, 'w') do |file|
                 file.puts(value)
@@ -146,13 +146,15 @@ module GitlabUserMerge
       end
     end
 
-    def check_json_columns(file: $stdout)
-      file.puts 'Scanning JSON columns for:'
-      file.puts '* integers matching duplicated user ids,'
-      file.puts '* strings containing duplicated usernames.'
-      file.puts
-      file.puts "Matching JSON values will be stored in #{DIR_JSON}..."
-      file.puts
+    def check_json_columns(file: $stdout, dir: DIR_COLUMN_JSON)
+      puts 'Scanning JSON columns for:'
+      puts '* integers matching duplicated user ids,'
+      puts '* strings containing duplicated usernames.'
+      puts
+      puts "Matching JSON values will be stored in #{dir}..."
+      puts
+
+      FileUtils.mkdir_p(dir)
 
       inhabited_tables.each do |table|
         connection.columns(table).each do |column|
@@ -171,16 +173,16 @@ module GitlabUserMerge
             search = JSONContextSearch.new(
               json,
               filter_integer: json_filter_integer,
-              filter_string: json_filter_string,
+              filter_string: json_filter_string
             )
             next if search.integers.empty? && search.strings.empty?
 
             search.report(file: file)
             matching_ids |= search.integers.keys
             matching_usernames |= search.strings.keys
-            
+
             suffix = "-#{search.integers.keys.join(',')}-#{search.strings.keys.join(',')}"
-            path = "#{DIR_JSON}/#{table}.#{column.name}/#{id}#{suffix}"
+            path = "#{dir}/#{table}.#{column.name}/#{id}#{suffix}"
             FileUtils.mkdir_p(File.dirname(path))
             JSON.write(path, json)
           end
@@ -188,12 +190,26 @@ module GitlabUserMerge
 
           file.puts
 
-          #puts "#{table}.#{column.name}:"
-          #file.puts "* matching ids: #{matching_ids.to_a}" unless matching_ids.empty?
-          #file.puts "* matching usernames: #{matching_usernames.to_a}" unless matching_usernames.empty?
-          #file.puts
+          # file.puts "#{table}.#{column.name}:"
+          # file.puts "* matching ids: #{matching_ids.to_a}" unless matching_ids.empty?
+          # file.puts "* matching usernames: #{matching_usernames.to_a}" unless matching_usernames.empty?
+          # file.puts
         end
       end
+    end
+
+    def check_text_and_json_columns(dir_text: DIR_COLUMN_TEXT, dir_json: DIR_COLUMN_JSON,
+                                    path_report_json: PATH_REPORT_COLUMN_JSON, path_report_text: PATH_REPORT_COLUMN_TEXT, path_report_text_array: PATH_REPORT_COLUMN_TEXT_ARRAY)
+      File.open(path_report_json, 'w') do |file|
+        check_json_columns(file: file, dir: dir_json)
+      end
+      File.open(path_report_text, 'w') do |file|
+        check_text_columns(file: file, dir: dir_text, dir_json: dir_json)
+      end
+      File.open(path_report_text_array, 'w') do |file|
+        check_text_array_columns(file: file)
+      end
+      nil
     end
   end
 end

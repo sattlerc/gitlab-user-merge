@@ -1,12 +1,6 @@
 # frozen_string_literal: true
 
 module GitlabUserMerge
-  # Writes and reads "column-classification.json" in current directory.
-  # Can be overriden using environment variable PATH_COLUMN_CLASSIFICATION.
-  PATH_COLUMN_CLASSIFICATION = ENV.fetch('PATH_COLUMN_CLASSIFICATION', 'column-classification.json')
-
-  # SQL = GitlabUserMerge::SQL
-
   # Classification of columns.
   # Possible match results:
   # * positive/negative: we confirmed that this column does / does not match,
@@ -33,20 +27,20 @@ module GitlabUserMerge
       }
     end
 
-    def report_table_columns(name, table_columns, file: $stdout)
+    def self.report_table_columns(name, table_columns, file: $stdout)
       file.puts "#{name}: #{table_columns.length}"
-      return if table_columns.empty?
-
-      table_columns.each do |table, column|
-        file.puts "- #{table}.#{column}"
+      unless table_columns.empty?
+        table_columns.each do |table, column|
+          file.puts "- #{table}.#{column}"
+        end
       end
       file.puts
     end
 
     def report(file: $stdout)
-      report_table_columns('positive', @positive, file: file)
-      report_table_columns('negative', @negative, file: file)
-      report_table_columns('unrecognized', @unrecognized, file: file)
+      self.class.report_table_columns('unrecognized', @unrecognized, file: file)
+      self.class.report_table_columns('positive', @positive, file: file)
+      self.class.report_table_columns('negative', @negative, file: file)
     end
   end
 
@@ -86,7 +80,7 @@ module GitlabUserMerge
     end
 
     def report(file: stdout)
-      file.puts '## Column classification report'
+      file.puts '## Table column classification report'
       file.puts
       hash.each do |kind, matches|
         file.puts "### #{kind.to_s.capitalize} columns"
@@ -95,18 +89,105 @@ module GitlabUserMerge
         file.puts
       end
     end
+
+    def check(duplicated_user_ids, file: $stdout, strict: true)
+      a = duplicated_user_ids
+      b = @search_user_ids
+      unless a == b
+        raise "Column classification: search user ids does not match duplicated user ids (rerun column classification): differences #{a - b} and #{b - a}"
+      end
+
+      unrecognized = hash.transform_values { |matches| matches.hash[:unrecognized] }
+      return if unrecognized.values.all?(&:empty?)
+
+      file.puts "#{strict ? 'Error' : 'Warning'}: unrecognized table columns remain."
+      file.puts
+
+      unrecognized.entries.each do |kind, matches|
+        ColumnMatches.report_table_columns("Unrecognized #{kind} columns", matches, file: file) unless matches.empty?
+      end
+
+      raise "Unrecognized table columns: #{unrecognized}" if strict
+    end
+
+    def check_empty(file: $stdout, strict: true)
+      ignore = [%w[users id], %w[namespaces owner_id]]
+
+      positive = hash.transform_values { |matches| matches.hash[true] }
+      positive[:ordinary].subtract(ignore)
+      return if positive.values.all?(&:empty?)
+
+      file.puts "#{strict ? 'Error' : 'Warning'}: positive table columns remain (ignoring #{ignore})."
+      file.puts
+
+      positive.entries.each do |kind, matches|
+        ColumnMatches.report_table_columns("Positive #{kind} columns", matches, file: file) unless matches.empty?
+      end
+
+      raise "Positive table columns: #{positive}" if strict
+    end
   end
 
   # Loading and caching a column classification.
   module WithColumnClassification
     include UserMapping
 
+    def column_classification_uncached
+      r = ColumnClassification.new.deserialize(JSON.read(PATH_COLUMN_CLASSIFICATION))
+      r.check(duplicated_user_ids)
+      r
+    end
+
     def column_classification
-      @column_classification ||= ColumnClassification.new.deserialize(JSON.read(PATH_COLUMN_CLASSIFICATION))
+      @column_classification ||= column_classification_uncached
+    end
+
+    def column_classification_clear
+      @column_classification = nil
     end
 
     def relevant_columns
       column_classification.hash.values.flat_map { |cm| cm.positive.to_a }.to_set
+    end
+
+    def create_column_classification(path_out: PATH_COLUMN_CLASSIFICATION,
+                                     path_report: PATH_REPORT_COLUMN_CLASSIFICATION)
+      puts 'Creating table column classification (this may take a minute)...'
+
+      column_classification_clear
+      check_single_database
+      File.open(path_report, 'w') do |file|
+        ColumnClassifier.new.scan_and_write(path_out: path_out, file: file)
+      end
+
+      puts "Report written to #{path_report}."
+      puts
+    end
+
+    def sql_not_user_namespace(type)
+      SQL.not_(SQL.equals(type, SQL.value('User')))
+    end
+
+    def check_namespace_owner_id
+      query = SQL.spacing do |e|
+        e << SQL::SELECT
+        e << SQL.identifier('id')
+        e << SQL.from(['namespaces', TABLE_USER_MAPPING])
+        e << SQL.where do |e1|
+          e1 << sql_not_user_namespace(SQL.table_column('namespaces', 'type'))
+          e1 << SQL.equals(
+            SQL.table_column('namespaces', 'owner_id'),
+            SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:source])
+          )
+        end
+      end
+
+      with_table_user_mapping do
+        namespaces_ids = connection.select_all(query).to_a
+        return if namespaces_ids.empty?
+
+        raise "Non-user namespaces owned by source users remain: #{namespace_ids}"
+      end
     end
   end
 
@@ -115,12 +196,6 @@ module GitlabUserMerge
     include SQLExecution
     include Models
     include UserMapping
-
-    def check_single_database
-      database_main = connection.current_database
-      database_ci = Ci::ApplicationRecord.connection.current_database
-      raise "Main and Ci databases differ: #{database_main} vs. #{database_ci}" unless database_main == database_ci
-    end
 
     def search(table, column, column_type: nil)
       table_column = SQL.table_column(TABLE_USER_MAPPING, VERSION_COLUMN_USER_MAPPING[:source])
@@ -183,7 +258,7 @@ module GitlabUserMerge
       # Two different tests for polymorphism:
       # a) via Rails reflection,
       # b) testing for a corresponding type column,
-      column_type = polymorphic_type_column(table, column)
+      column_type = polymorphic_type_column(table, column.name)
       return true unless column_type.nil?
 
       models_by_table[table].each do |model|
@@ -197,7 +272,7 @@ module GitlabUserMerge
     end
 
     def scan_column_polymorphic(table, column)
-      column_type = polymorphic_type_column(table, column)
+      column_type = polymorphic_type_column(table, column.name)
 
       # Redundant with next check.
       query = SQL.spacing do |e|
@@ -231,6 +306,7 @@ module GitlabUserMerge
       user_id_upper_bound + 10
     end
 
+    # Override for ordinary columns referencing users.
     TABLE_COLUMN_INCLUDE = [
       %w[group_type_ci_runners creator_id],
       %w[groups_visits user_id],
@@ -323,8 +399,9 @@ module GitlabUserMerge
     def scan_and_write(path_out: PATH_COLUMN_CLASSIFICATION, file: $stdout)
       cc = scan
       cc.report(file: file)
+      cc.check(duplicated_user_ids, strict: false)
       JSON.write(path_out, ::JSON.parse(cc.to_json))
-      puts "Column classification written to #{PATH_COLUMN_CLASSIFICATION}."
+      puts "Table column classification written to #{PATH_COLUMN_CLASSIFICATION}."
     end
   end
 end

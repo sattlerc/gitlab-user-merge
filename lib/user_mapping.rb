@@ -5,13 +5,15 @@ module GitlabUserMerge
   module UserMapping
     include SQLExecution
 
-    # Requires "user-mapping.json" in current directory.
-    # Can be overriden using environment variable PATH_USER_MAPPING.
-    # This is a JSON object sending source user ids (merge source) to target user id (merge target).
-    PATH_USER_MAPPING = ENV.fetch('PATH_USER_MAPPING', 'user-mapping.json')
+    def user_mapping_uncached
+      r = JSON.read(PATH_USER_MAPPING).transform_keys(&:to_i)
+      raise 'User mapping does not have pairwise distinct ids' unless General.unique_entries(r.keys + r.values)
+
+      r
+    end
 
     def user_mapping
-      @user_mapping ||= JSON.read(PATH_USER_MAPPING).transform_keys(&:to_i)
+      @user_mapping ||= user_mapping_uncached
     end
 
     def versions_user_id

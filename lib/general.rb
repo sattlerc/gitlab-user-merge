@@ -120,6 +120,10 @@ module GitlabUserMerge
       raise "Not a singleton: #{collection}"
     end
 
+    def self.unique_entries(array)
+      array.to_set.size == array.size
+    end
+
     ## Other.
 
     def self.equal_strictly(value_a, value_b)

@@ -6,27 +6,32 @@ module GitlabUserMerge
     include UserMapping
     include Models
 
-    def report_personal_projects
-      puts 'Printing personal projects...'
-      puts
-
+    def report_personal_projects_with_file(file: $stdout)
       versions_user_id.each do |version_user_id|
         version_user = version_user_id.transform_values { |id| user(id) }
         version_namespace = version_user.transform_values(&:namespace)
         version_projects = version_namespace.transform_values { |namespace| Project.where(namespace: namespace.id) }
         next if version_projects.all? { |projects| projects.empty? }
 
-        puts "Projects for user mapping #{Version.format_arrow(version_user_id)}:"
+        file.puts "Projects for user mapping #{Version.format_arrow(version_user_id)}:"
         version_projects.entries.each do |v, projects|
           next if projects.empty?
 
-          puts "* #{v.to_s.capitalize} projects (namespace #{version_namespace[v].id}):"
+          file.puts "* #{v.to_s.capitalize} projects (namespace #{version_namespace[v].id}):"
           projects.each do |project|
-            puts "  - #{format_project(project)}"
+            file.puts "  - #{format_project(project)}"
           end
         end
-        puts
+        file.puts
       end
+    end
+
+    def report_personal_projects(path_report: PATH_REPORT_PERSONAL_PROJECTS)
+      puts 'Reporting personal projects...'
+      File.open(path_report, 'w') do |file|
+        report_personal_projects_with_file(file: file)
+      end
+      nil
     end
 
     def check_personal_projects_for_conflict
@@ -42,15 +47,17 @@ module GitlabUserMerge
 
         version_projects[:source].merge(version_projects[:target]) do |path, source_project, target_project|
           good = false
-          version_project = Version.of_pair(source_project, target_project)
+          version_project = Version.of_pair([source_project, target_project])
           puts "* Project path conflict for #{Version.format_arrow(version_user_id)}: #{path}"
-          Version.VERSIONS.each do |v|
+          Version::VERSIONS.each do |v|
             puts "  - #{v.to_s.capitalize}: #{format_project(version_project[v])}"
           end
           puts
         end
       end
       raise 'project conflicts detected' unless good
+
+      nil
     end
 
     def transfer_personal_projects
@@ -68,11 +75,14 @@ module GitlabUserMerge
           puts
         end
       end
+
+      column_conflicts_clear
+      nil
     end
 
     def check_no_personal_projects_for_user_id(user_id)
       Project.where(namespace: user(user_id).namespace.id).each do |project| # rubocop:disable Lint/UnreachableLoop
-        raise "personal project #{project}"
+        raise "personal project #{format_project(project)}"
       end
     end
 
@@ -81,6 +91,7 @@ module GitlabUserMerge
       versions_user_id.each do |version_user_id|
         check_no_personal_projects_for_user_id(version_user_id[:source])
       end
+      nil
     end
 
     def refresh_project_authorizations
@@ -100,6 +111,18 @@ module GitlabUserMerge
           Users::UpdateHighestMemberRoleService.new(user(user_id)).execute
         end
       end
+    end
+
+    def perform_personal_projects_transfer(perform: false)
+      report_personal_projects
+      check_personal_projects_for_conflict
+      return unless perform
+
+      transfer_personal_projects
+      check_personal_projects_clear
+      refresh_project_authorizations
+      refresh_user_highest_roles
+      nil
     end
   end
 end

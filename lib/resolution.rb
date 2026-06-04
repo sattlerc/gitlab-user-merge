@@ -623,13 +623,33 @@ module GitlabUserMerge
       resolutions[[table, column]]
     end
 
-    def format_version_value(table, column, version_keys, version_value, resolution: false)
-      return SQL.format_symbol_hash(version_value) unless resolution && resolution(table, column).resolve?
+    def format_version_value(table, column, version_keys, version_value, include_resolution: false)
+      if include_resolution
+        resolution = resolution(table, column)
+        include_resolution = false if !resolution.nil? && (resolution.ignore? || !resolution.resolve?)
+      end
+      return SQL.format_symbol_hash(version_value) unless include_resolution
+      return resolution.action(version_keys, version_value).format(version_value) unless resolution.nil?
 
-      resolution(table, column).action(version_keys, version_value).format(version_value)
+      SQL.listing do |e|
+        e << SQL.format_symbol_hash(version_value)
+        e << 'resolution MISSING'
+      end
     end
 
-    def resolution_sql_queries_for_conflict(table, version_keys, values, deletion: false, &block)
+    def perform_conflict_resolution_for_conflict(table, version_keys, values, executor, deletion: false)
+      # Workaround for unique indexes.
+      unique_substring = '_unique_substring_'
+      unique_table_columns = [
+        %w[users static_object_token],
+        %w[users unlock_token],
+        %w[users reset_password_token],
+        %w[users confirmation_token],
+        %w[users email]
+      ].to_set
+
+      need_uniqueness = Set.new
+
       assignments = Enumerator.new do |e|
         values.entries.each do |column, version_value|
           resolution = resolution(table, column)
@@ -638,12 +658,32 @@ module GitlabUserMerge
           action = resolution.action(version_keys, version_value)
           next if action.respond_to?(:version) && action.version == :target
 
-          e << [
-            column,
-            action.combine_sql(Version::VERSIONS.index_with { |v| Version.sql_column(v, column) })
-          ]
+          value = action.combine_sql(Version::VERSIONS.index_with { |v| Version.sql_column(v, column) })
+          if unique_table_columns.include?([table, column])
+            need_uniqueness.add(column)
+            value = SQL.function('REPLACE', value, SQL.value(unique_substring), SQL.value(''))
+          end
+          e << [column, value]
         end
       end.to_a
+
+      unless need_uniqueness.empty?
+        update_old = SQL.spacing do |e|
+          e << SQL::UPDATE
+          e << SQL.identifier(table)
+          e << SQL.set(need_uniqueness.map { |c|
+            [c,
+             SQL.if_else(SQL.null?(SQL.identifier(c)), SQL.value(nil),
+                         SQL.function('CONCAT', SQL.value(unique_substring), SQL.identifier(c)))]
+          })
+          e << SQL.where do |e1|
+            version_keys[:source].entries.each do |key, value|
+              e1 << SQL.equals(SQL.identifier(key), SQL.value(value))
+            end
+          end
+        end
+        executor.execute(update_old)
+      end
 
       unless assignments.empty?
         update = SQL.spacing do |e|
@@ -659,7 +699,7 @@ module GitlabUserMerge
             end
           end
         end
-        block.call(update)
+        executor.execute(update)
       end
       return unless deletion
 
@@ -668,7 +708,7 @@ module GitlabUserMerge
         e << SQL.from(table)
         e << SQL.where(SQL.keys_clause(version_keys[:source]))
       end
-      block.call(delete)
+      executor.execute(delete)
     end
   end
 end

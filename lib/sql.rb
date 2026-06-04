@@ -105,6 +105,8 @@ module GitlabUserMerge
     end
 
     def self.value(value)
+      return 'NULL' if value.nil?
+
       case value
       when Integer
         integer(value)
@@ -207,6 +209,27 @@ module GitlabUserMerge
 
     def self.anding(&words)
       and_(*collecting(&words)) unless words.nil?
+    end
+
+    def self.if_else(condition, value_true, value_false)
+      spacing do |e|
+        e << 'CASE'
+        e << 'WHEN'
+        e << condition
+        e << 'THEN'
+        e << value_true
+        e << 'ELSE'
+        e << value_false
+        e << 'END'
+      end
+    end
+
+    def self.null?(value)
+      spacing do |e|
+        e << value
+        e << 'IS'
+        e << 'NULL'
+      end
     end
 
     def self.identifier(identifier)
@@ -342,12 +365,22 @@ module GitlabUserMerge
         e << values(values, multiple: multiple)
       end
     end
+
+    def self.statement(query)
+      "#{query};"
+    end
   end
 
   # Query execution.
   module SQLExecution
     def connection
       ActiveRecord::Base.connection
+    end
+
+    def check_single_database
+      database_main = connection.current_database
+      database_ci = Ci::ApplicationRecord.connection.current_database
+      raise "Main and Ci databases differ: #{database_main} vs. #{database_ci}" unless database_main == database_ci
     end
 
     def select_unique(query)
@@ -381,6 +414,32 @@ module GitlabUserMerge
 
     def execute_insert(*args, **kwargs)
       connection.execute(SQL.insert(*args, **kwargs))
+    end
+
+    def transaction_begin
+      connection.execute('BEGIN')
+    end
+
+    def transaction_commit
+      connection.execute('COMMIT')
+    end
+
+    def transaction_rollback
+      connection.execute('ROLLBACK')
+    end
+
+    def transaction(&block)
+      puts 'Transaction: begin'
+      transaction_begin
+      begin
+        block.call
+        puts 'Transaction: committing'
+        transaction_commit
+      rescue StandardError
+        puts 'transaction: rolling back'
+        transaction_rollback
+        raise
+      end
     end
 
     def tables
@@ -463,8 +522,8 @@ module GitlabUserMerge
     end
 
     def polymorphic_type_column(table, column)
-      stem = column.name.delete_suffix('_id')
-      return nil if stem == column.name
+      stem = column.delete_suffix('_id')
+      return nil if stem == column
 
       column_type_name = "#{stem}_type"
       column_type = columns_for_table(table)[column_type_name]
@@ -472,6 +531,67 @@ module GitlabUserMerge
       return nil unless SQL.type_text?(column_type.sql_type)
 
       column_type
+    end
+
+    class SQLQueryExecutor
+      def initialize(outer, perform: false, abort: true, logging: nil)
+        @outer = outer
+        @perform = perform
+        @abort = abort
+        @logging = logging
+        @schedule = []
+        @in_transaction = false
+      end
+
+      def execute(query)
+        @logging.puts(SQL.statement(query)) unless @logging.nil?
+        @outer.connection.execute(query) if @perform
+      end
+
+      # Schedule for running after committing (or run immediately if not in a transaction).
+      # Useful for cache clearing.
+      def schedule(&callback)
+        return unless @perform
+
+        if @in_transaction
+          @schedule.append(callback)
+        else
+          callback.call
+        end
+      end
+
+      def transaction(&block)
+        raise 'already in a transaction' if @in_transaction
+        return block.call unless @perform
+
+        @in_transaction = true
+        begin
+          @outer.transaction do
+            block.call
+            raise 'Aborting.' if @abort
+          end
+
+          @schedule.each(&:call)
+          @schedule = []
+        rescue StandardError
+          @in_transaction = false
+          raise
+        end
+      end
+    end
+
+    def with_executor(path_report_queries: PATH_REPORT_QUERIES, perform: false, abort: true, &block)
+      u = proc do |file|
+        executor = SQLQueryExecutor.new(self, perform: perform, abort: abort, logging: file)
+        block.call(executor)
+      end
+
+      if path_report_queries.nil?
+        u.call($stdout)
+      else
+        puts "Logging queries to #{path_report_queries}."
+        File.open(path_report_queries, 'w', &u)
+      end
     end
   end
 end

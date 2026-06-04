@@ -237,6 +237,10 @@ module GitlabUserMerge
       @column_conflicts_by_table ||= column_conflicts_by_table_uncached
     end
 
+    def column_conflicts_by_table_clear
+      @column_conflicts_by_table = nil
+    end
+
     def conflict_columns(table)
       column_conflicts_by_table[table].values.flat_map { |values| values.keys.to_a }.to_set
     end
@@ -276,10 +280,14 @@ module GitlabUserMerge
       @column_conflicts_by_table_and_column ||= column_conflicts_by_table_and_column_uncached
     end
 
+    def column_conflicts_by_table_and_column_clear
+      @column_conflicts_by_table_and_column = nil
+    end
+
     def print_column_conflicts_by_table_and_column(file: $stdout, skip_resolved: false, include_resolution: false)
       file.puts "## #{skip_resolved ? 'Unresolved conflicts' : 'Conflicts'} by table column"
       file.puts
-      if !skip_resolved && resolution
+      if !skip_resolved && include_resolution
         file.puts 'Resolution decisions are highlighted.'
         file.puts
       end
@@ -297,7 +305,7 @@ module GitlabUserMerge
           by_keys.entries.each do |version_keys, version_value|
             formatted_keys = format_version_keys(version_keys)
             formatted_value = format_version_value(table, column, version_keys, version_value,
-                                                   resolution: include_resolution)
+                                                   include_resolution: include_resolution)
             file.puts "* #{formatted_keys}: #{formatted_value}"
           end
           file.puts
@@ -327,10 +335,14 @@ module GitlabUserMerge
       @column_conflicts_by_version_user_id ||= column_conflicts_by_version_user_id_uncached
     end
 
+    def column_conflicts_by_version_user_id_clear
+      @column_conflicts_by_version_user_id = nil
+    end
+
     def print_column_conflicts_by_version_user_id(file: $stdout, skip_resolved: false, include_resolution: false)
-      file.puts "## #{skip_resolved ? 'Unresolved conflicts' : 'Conflicts'} by user mapping}"
+      file.puts "## #{skip_resolved ? 'Unresolved conflicts' : 'Conflicts'} by user mapping"
       file.puts
-      if !skip_resolved && resolution
+      if !skip_resolved && include_resolution
         file.puts 'Resolution decisions are highlighted.'
         file.puts
       end
@@ -349,13 +361,28 @@ module GitlabUserMerge
               next if skip_resolved && !resolution(table, column).nil?
 
               formatted_value = format_version_value(table, column, version_keys, version_value,
-                                                     resolution: include_resolution)
+                                                     include_resolution: include_resolution)
               file.puts "* #{column}: #{formatted_value}"
             end
             file.puts
           end
         end
       end
+    end
+
+    def report_column_conflicts(path_by_user_mapping: PATH_REPORT_COLUMN_CONFLICTS_BY_VERSION_USER_ID,
+                                path_by_table_column: PATH_REPORT_COLUMN_CONFLICTS_BY_TABLE_AND_COLUMN)
+      puts 'Reporting column conflicts...'
+      [
+        ['user mapping', path_by_user_mapping, method(:print_column_conflicts_by_version_user_id)],
+        ['table column', path_by_table_column, method(:print_column_conflicts_by_table_and_column)]
+      ].each do |kind, path, callback|
+        File.open(path, 'w') do |file|
+          callback.call(file: file, include_resolution: true)
+        end
+        puts "* by #{kind}: #{path}"
+      end
+      puts
     end
 
     def unresolved_conflicts
@@ -366,39 +393,48 @@ module GitlabUserMerge
       end.to_set
     end
 
-    def check_for_unresolved_conflicts(file: $stdout)
-      file.puts 'Checking for unresolved conflicts...'
+    def check_for_unresolved_conflicts(file: $stdout, strict: true)
+      puts 'Checking for unresolved conflicts...'
       return if unresolved_conflicts.empty?
 
-      file.puts
+      puts
       print_column_conflicts_by_table_and_column(file: file, skip_resolved: true)
-      raise "Unresolved conflicts: #{unresolved_conflicts}"
+      raise "Unresolved conflicts: #{unresolved_conflicts}" if strict
     end
 
-    def resolution_sql_queries_for_table(table, deletion: false, &block)
+    def column_conflicts_clear
+      column_conflicts_by_table_clear
+      column_conflicts_by_table_and_column_clear
+      column_conflicts_by_version_user_id_clear
+    end
+
+    def perform_conflict_resolution_for_table(table, executor, deletion: false)
       column_conflicts_by_table[table].entries.each do |version_keys, values|
-        resolution_sql_queries_for_conflict(table, version_keys, values, deletion: deletion, &block)
+        perform_conflict_resolution_for_conflict(table, version_keys, values, executor, deletion: deletion)
       end
     end
 
-    # If activated, deletes from users table last to handle cascading deletion.
-    #
     # Note:
     # Users should rather be deleted at application logic level (User.find(id).destroy!).
     # The database logic misses some cascading deletions.
-    def resolution_sql_queries(delete_user: false, deletion: false, &block)
-      table_users, table_non_users = column_conflicts_by_table.keys.partition { |table| table == 'users' }
-      table_non_users.each do |table|
-        resolution_sql_queries_for_table(table, deletion: deletion, &block)
-      end
-      table_users.each do |table|
-        resolution_sql_queries_for_table(table, deletion: deletion && delete_user, &block)
-      end
-    end
+    # If activated nonetheless, deletes from users table last to handle cascading deletion.
+    def perform_conflict_resolution(executor, delete_user: false, deletion: false)
+      puts 'Performing conflict resolution...'
 
-    def print_resolution_queries(deletion: false, file: $stdout)
-      resolution_sql_queries(deletion: deletion) do |query|
-        file.puts query
+      check_for_unresolved_conflicts
+
+      begin
+        table_users, table_non_users = column_conflicts_by_table.keys.partition { |table| table == 'users' }
+        table_non_users.each do |table|
+          perform_conflict_resolution_for_table(table, executor, deletion: deletion)
+        end
+        table_users.each do |table|
+          perform_conflict_resolution_for_table(table, executor, deletion: deletion && delete_user)
+        end
+      ensure
+        executor.schedule do
+          column_conflicts_clear
+        end
       end
     end
   end
