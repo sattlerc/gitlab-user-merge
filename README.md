@@ -23,6 +23,8 @@ I was not able to find existing code for this problem, so I wrote my own (learni
 * URLs to personal projects of merged users remain valid due to GitLab's route redirect mechanism.
   In particular, no remotes in git projects have to be updated.
 
+The tool has been tested with GitLab 18.8.
+
 The below guide explains the workflow of using the tool.
 
 ## Stop GitLab
