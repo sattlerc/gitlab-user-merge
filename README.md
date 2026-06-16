@@ -275,11 +275,11 @@ We want to handle these conflicts in a way that defaults to the most useful vers
     It will create the following reports:
     * `column-conflicts-by-user-mapping.txt`
     * `column-conflicts-by-table-and-column.txt`
-    
+
     Any entry with `resolution MISSING` denotes an unresolved conflict.
     Resolve these conflicts at table column level by choosing a resolution and adding it to the hash `RESOLUTIONS` in [`lib/resolution.rb`](lib/resolution.rb).
     Some example resolutions have already been made (with resulting actions highlighted the reports), but you should double-check the entire hash.
-    
+
     Restart the GitLab Rails console and reload the codebase.
     You may go back to the beginning of this step to see how your conflicts resolve with your resolution decisions.
 
@@ -288,7 +288,7 @@ We want to handle these conflicts in a way that defaults to the most useful vers
     ```ruby
     tool.check_for_unresolved_conflicts
     ```
-    
+
     to confirm that all conflicts have been resolved.
 
 ### Background (skippable)
@@ -314,7 +314,7 @@ Users may see a warning when they pull or push using git, advising them to updat
     ```ruby
     tool.report_personal_projects
     ```
-    
+
     This produces a report `personal-projects.txt` of all personal projects of source and target users.
 
 2)  Run:
@@ -322,18 +322,30 @@ Users may see a warning when they pull or push using git, advising them to updat
     ```ruby
     tool.check_personal_projects_for_conflict
     ```
-    
+
     This will detect if any pairing of source and target user has a personal project with the same path.
     Usually, this happens when a duplicated user reuploads a repository.
     Deal with those cases manually (determining which repository supercedes and deleting the other one).
 
-3)  Run
+3)  **Only for this step**: have Redis running:
+
+    ```bash
+    gitlab-ctl start redis
+    ```
+
+    Run
 
     ```ruby
     tool.transfer_personal_projects
     ```
-    
+
     to transfer the personal projects.
+
+    Now stop Redis again:
+
+    ```bash
+    gitlab-ctl stop redis
+    ```
 
 4)  Run
 
@@ -356,7 +368,7 @@ This is implemented in [`lib/personal_projects.rb`](lib/personal_projects.rb).
     ```ruby
     tool.perform_user_merge(perform: false)
     ```
-    
+
     Double-check the destructive queries generated in `database-queries.txt`.
 
 2)  If you wish, you can test these queries by performing an abortive transaction:
@@ -364,7 +376,7 @@ This is implemented in [`lib/personal_projects.rb`](lib/personal_projects.rb).
     ```ruby
     tool.perform_user_merge(perform: true, abort: true)
     ```
-    
+
     This will run these queries in a transaction block before rolling it back.
 
 3)  Perform the user merge merge:
@@ -378,7 +390,7 @@ This is implemented in [`lib/personal_projects.rb`](lib/personal_projects.rb).
     ```ruby
     tool.delete_source_users(perform: false)
     ```
-    
+
     This checks that no traces of source users remain in the database.
 
 5)  Perform the actual deletion of source users:
@@ -402,7 +414,7 @@ User merging involves two kinds of database updates:
     These are personal namespaces, in one-to-one correspondence with users.
     Because the table `namespaces` is polymorphic, this one-to-one relationship is not made explicit in the database schema (though it is in the application logic).
     Replacing owners of personal namespaces would produce duplicate personal namespaces.
-    
+
     TODO:
     Implement database-level merging of personal namespaces.
     Might not be worthwhile: most fields of personal namespaces appear unused.
