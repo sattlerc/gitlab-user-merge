@@ -598,6 +598,7 @@ module GitlabUserMerge
       %w[users otp_grace_period_started_at] => OTP,
       %w[users otp_required_for_login] => OTP,
       %w[users otp_secret_expires_at] => OTP,
+      %w[users otp_secret] => OTP,
 
       # User account locking.
       %w[users locked_at] => LOCKED,
