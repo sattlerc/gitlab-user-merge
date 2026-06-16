@@ -76,7 +76,14 @@ module GitlabUserMerge
 
     def perform_user_replacement_in_ordinary_columns(executor)
       column_classification.ordinary.positive.each do |table, column|
+        next unless table == 'project_authorizations_for_migration'
+
+        perform_user_replacement_in_non_array_column(table, column, executor)
+      end
+
+      column_classification.ordinary.positive.each do |table, column|
         next if table == 'users' && column == 'id'
+        next if table == 'project_authorizations_for_migration'
 
         if table == 'namespaces' && column == 'owner_id'
           perform_user_replacement_in_non_array_column(table, column, executor) do |e|
