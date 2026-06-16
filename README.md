@@ -58,7 +58,7 @@ Back your database up before running destructive parts of this codebase:
 gitlab-rake gitlab:backup:db:create
 ```
 
-On my installation, this takes about 2.2 minutes creates a database backup `/var/opt/gitlab/backups/db/database.sql.gz` (**warning**: this appears to override this file if it exists).
+On my installation, this takes about 2.2 minutes and creates a database backup `/var/opt/gitlab/backups/db/database.sql.gz` (**warning**: this appears to override this file if it exists).
 
 To restore, you can use the following command (taking about 6.5 minutes for me):
 
@@ -87,7 +87,7 @@ In my case, this is user `git`.
 In the GitLab Rails console, you can then load this codebase as follows:
 
 ```ruby
-load '<path to codebase>/gitlab_merge_tool.rb'
+load '<path to codebase>/gitlab_user_merge.rb'
 ```
 
 The entire codebase is namespaced to module `GitlabUserMerge`.
